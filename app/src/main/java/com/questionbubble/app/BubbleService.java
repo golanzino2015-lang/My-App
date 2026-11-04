@@ -33,6 +33,9 @@ import java.util.concurrent.Executors;
  */
 public class BubbleService extends AccessibilityService {
 
+    /** The running service, or null when Accessibility access is off. */
+    static BubbleService instance;
+
     private static final String CROP_PROMPT = "Answer the question shown in this image.";
     private static final String FULL_PROMPT =
             "This is a screenshot of the user's screen. Find the main question on it and answer it.";
@@ -51,6 +54,7 @@ public class BubbleService extends AccessibilityService {
     private Bitmap screenshot;
     private boolean busy;
     private long menuClosedAt;
+    private String chatCaptureId; // set while a scan is collecting an image for a chat
 
     private final SharedPreferences.OnSharedPreferenceChangeListener prefListener = (sp, key) -> {
         if (Prefs.K_BUBBLE_VISIBLE.equals(key)) {
@@ -103,6 +107,7 @@ public class BubbleService extends AccessibilityService {
         });
         Prefs.sp(this).registerOnSharedPreferenceChangeListener(prefListener);
         if (Prefs.bubbleVisible(this)) showBubble();
+        instance = this;
     }
 
     private void showBubble() {
@@ -139,6 +144,7 @@ public class BubbleService extends AccessibilityService {
     }
 
     private void cleanup() {
+        if (instance == this) instance = null;
         try {
             Prefs.sp(this).unregisterOnSharedPreferenceChangeListener(prefListener);
         } catch (Exception ignored) {
@@ -190,6 +196,12 @@ public class BubbleService extends AccessibilityService {
                     }
 
                     @Override
+                    public void chat(String chatId, boolean fresh) {
+                        closeMenu();
+                        openChat(chatId, fresh, null);
+                    }
+
+                    @Override
                     public void copyLast() {
                         History.Item last = History.latest(BubbleService.this);
                         closeMenu();
@@ -212,12 +224,44 @@ public class BubbleService extends AccessibilityService {
 
     // ---------------------------------------------------------------- scan
 
+    /** Called by the chat screen: capture part of the screen and attach it to that chat. */
+    void captureForChat(String chatId) {
+        chatCaptureId = chatId;
+        if (menu != null) menu.dismissNow();
+        main.postDelayed(this::startScan, 260);
+    }
+
+    void openChat(String chatId, boolean fresh, String attach) {
+        Intent i = new Intent(this, ChatActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (chatId != null) i.putExtra(ChatActivity.EXTRA_CHAT, chatId);
+        if (fresh) i.putExtra(ChatActivity.EXTRA_NEW, true);
+        if (attach != null) i.putExtra(ChatActivity.EXTRA_ATTACH, attach);
+        startActivity(i);
+    }
+
+    /** Save the picked area and reopen the chat with it attached. */
+    private void deliverToChat(Bitmap img) {
+        String id = chatCaptureId;
+        chatCaptureId = null;
+        worker.execute(() -> {
+            String name = null;
+            try {
+                name = Chats.saveImage(this, img);
+            } catch (Exception ignored) {
+            } finally {
+                img.recycle();
+            }
+            String n = name;
+            main.post(() -> openChat(id, false, n));
+        });
+    }
+
     private void startScan() {
-        if (busy) {
+        if (chatCaptureId == null && busy) {
             island.show(Island.Kind.INFO, "One moment", "Still answering your last question", 2200);
             return;
         }
-        if (!checkKey()) return;
+        if (chatCaptureId == null && !checkKey()) return;
         island.hideNow();
         bubble.setHidden(true);
         main.postDelayed(() -> takeScreenshot(Display.DEFAULT_DISPLAY, getMainExecutor(),
@@ -230,6 +274,7 @@ public class BubbleService extends AccessibilityService {
                         hb.close();
                         if (soft == null) {
                             bubble.setHidden(false);
+                            reopenChatAfterFailure();
                             island.show(Island.Kind.ERROR, "Couldn't capture the screen", "Please try again", 3500);
                             return;
                         }
@@ -239,10 +284,18 @@ public class BubbleService extends AccessibilityService {
                     @Override
                     public void onFailure(int errorCode) {
                         bubble.setHidden(false);
+                        reopenChatAfterFailure();
                         island.show(Island.Kind.ERROR, "Couldn't capture the screen",
                                 "Try again in a second (error " + errorCode + ")", 3500);
                     }
                 }), 220);
+    }
+
+    private void reopenChatAfterFailure() {
+        if (chatCaptureId == null) return;
+        String id = chatCaptureId;
+        chatCaptureId = null;
+        main.postDelayed(() -> openChat(id, false, null), 600);
     }
 
     private void showSelection(Bitmap shot) {
@@ -254,7 +307,8 @@ public class BubbleService extends AccessibilityService {
                         .copy(Bitmap.Config.ARGB_8888, false);
                 main.postDelayed(() -> {
                     removeSelection(true);
-                    ask(crop, CROP_PROMPT);
+                    if (chatCaptureId != null) deliverToChat(crop);
+                    else ask(crop, CROP_PROMPT);
                 }, 180);
             }
 
@@ -267,12 +321,18 @@ public class BubbleService extends AccessibilityService {
             public void onFullScreen() {
                 Bitmap full = shot.copy(Bitmap.Config.ARGB_8888, false);
                 removeSelection(true);
-                ask(full, FULL_PROMPT);
+                if (chatCaptureId != null) deliverToChat(full);
+                else ask(full, FULL_PROMPT);
             }
 
             @Override
             public void onCancel() {
                 removeSelection(true);
+                if (chatCaptureId != null) {
+                    String id = chatCaptureId;
+                    chatCaptureId = null;
+                    openChat(id, false, null);
+                }
             }
         });
 
@@ -331,23 +391,25 @@ public class BubbleService extends AccessibilityService {
         area.inset(-pad, -pad);
         if (!area.intersect(0, 0, w, h)) area.set(0, 0, w, h);
 
+        boolean forChat = chatCaptureId != null;
         Bitmap crop = Bitmap.createBitmap(shot, area.left, area.top, area.width(), area.height())
                 .copy(Bitmap.Config.ARGB_8888, true);
-        Paint red = new Paint(Paint.ANTI_ALIAS_FLAG);
-        red.setStyle(Paint.Style.STROKE);
-        red.setStrokeWidth(Theme.dp(this, 4));
-        red.setColor(Color.RED);
-        new Canvas(crop).drawCircle(x - area.left, y - area.top, Theme.dp(this, 26), red);
-
-        SelectionView sv = selection;
-        if (sv != null) {
-            sv.showDetected(area, () -> {
-                removeSelection(true);
-                ask(crop, POINT_PROMPT);
-            });
-        } else {
-            ask(crop, POINT_PROMPT);
+        if (!forChat) {
+            Paint red = new Paint(Paint.ANTI_ALIAS_FLAG);
+            red.setStyle(Paint.Style.STROKE);
+            red.setStrokeWidth(Theme.dp(this, 4));
+            red.setColor(Color.RED);
+            new Canvas(crop).drawCircle(x - area.left, y - area.top, Theme.dp(this, 26), red);
         }
+
+        Runnable go = () -> {
+            removeSelection(true);
+            if (forChat) deliverToChat(crop);
+            else ask(crop, POINT_PROMPT);
+        };
+        SelectionView sv = selection;
+        if (sv != null) sv.showDetected(area, go);
+        else go.run();
     }
 
     private Rect findQuestionArea(int x, int y, int screenW, int screenH) {

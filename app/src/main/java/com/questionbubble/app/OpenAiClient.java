@@ -109,7 +109,7 @@ final class OpenAiClient {
         }
     }
 
-    private static String friendlyError(int code, String body) {
+    static String friendlyError(int code, String body) {
         if (code == 401) return "That API key was rejected. Check it and try again.";
         if (code == 429) return "Rate limit or quota reached on your OpenAI account.";
         if (code == 404) return "That model isn't available on your account.";
@@ -135,7 +135,7 @@ final class OpenAiClient {
         return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
     }
 
-    private static String readAll(InputStream is) throws Exception {
+    static String readAll(InputStream is) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] buf = new byte[8192];
         int n;

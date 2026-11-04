@@ -66,6 +66,10 @@ public class MainActivity extends Activity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = Theme.text(this, "Question Bubble", Theme.Type.HEADLINE);
         bar.addView(title, new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
+        View chatBtn = Rows.iconButton(this, R.drawable.ic_message, () -> startActivity(new Intent(this, ChatActivity.class)));
+        LinearLayout.LayoutParams cbp = new LinearLayout.LayoutParams(dp(42), dp(42));
+        cbp.rightMargin = dp(8);
+        bar.addView(chatBtn, cbp);
         bar.addView(Rows.iconButton(this, R.drawable.ic_history, this::openHistory));
         add(bar, 8, step++);
 

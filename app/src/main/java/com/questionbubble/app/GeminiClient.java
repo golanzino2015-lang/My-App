@@ -104,7 +104,7 @@ final class GeminiClient {
         }
     }
 
-    private static String friendlyError(int code, String body) {
+    static String friendlyError(int code, String body) {
         String msg = "";
         try {
             msg = new JSONObject(body).getJSONObject("error").optString("message", "");

@@ -25,6 +25,7 @@ final class MenuPopover {
         void history();
         void settings();
         void copyLast();
+        void chat(String chatId, boolean fresh);
     }
 
     private final Context c;
@@ -56,53 +57,35 @@ final class MenuPopover {
 
         List<View> stagger = new ArrayList<>();
 
-        // header
+        // header: page tabs + status
         LinearLayout header = new LinearLayout(c);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(4), 0, dp(2), 0);
-        TextView title = Theme.text(c, "Question Bubble", Theme.Type.TITLE_S);
-        title.setTextSize(15.5f);
-        header.addView(title, new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
+        SegmentedView tabs = new SegmentedView(c, new String[]{"Tools", "Chat"}, 0);
+        header.addView(tabs, new LinearLayout.LayoutParams(dp(150), Theme.WRAP));
+        View spacer = new View(c);
+        header.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1));
         header.addView(statusChip(busy));
         panel.addView(header);
         stagger.add(header);
 
-        // hero action
-        LinearLayout hero = new LinearLayout(c);
-        hero.setOrientation(LinearLayout.HORIZONTAL);
-        hero.setGravity(Gravity.CENTER_VERTICAL);
-        hero.setPadding(dp(12), dp(12), dp(14), dp(12));
-        hero.setBackground(new android.graphics.drawable.RippleDrawable(
-                android.content.res.ColorStateList.valueOf(0x1F000000),
-                Theme.rounded(Theme.WHITE, dp(20)), Theme.rounded(Theme.WHITE, dp(20))));
-        FrameLayout disc = new FrameLayout(c);
-        disc.setBackground(Theme.rounded(Theme.BLACK, dp(21)));
-        disc.addView(Theme.icon(c, R.drawable.ic_scan, Theme.WHITE, 20));
-        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(42), dp(42));
-        dlp.rightMargin = dp(12);
-        hero.addView(disc, dlp);
-        LinearLayout heroText = new LinearLayout(c);
-        heroText.setOrientation(LinearLayout.VERTICAL);
-        TextView ht = Theme.text(c, "Scan question", Theme.Type.TITLE_S);
-        ht.setTextSize(15.5f);
-        ht.setTextColor(Theme.BLACK);
-        TextView hs = Theme.oneLine(Theme.text(c, "Drag to crop · Hold to detect", Theme.Type.LABEL));
-        hs.setTextColor(0x8C000000);
-        heroText.addView(ht);
-        heroText.addView(hs, Theme.lp(Theme.WRAP, Theme.WRAP, dp(3)));
-        hero.addView(heroText, new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
-        hero.addView(Theme.icon(c, R.drawable.ic_chevron_right, 0x66000000, 18));
-        hero.setClickable(true);
-        hero.setOnClickListener(v -> {
-            Theme.tap(v);
-            actions.scan();
-        });
-        Theme.pressable(hero, 0.97f);
-        panel.addView(hero, Theme.lp(Theme.MATCH, Theme.WRAP, dp(14)));
-        stagger.add(hero);
+        PagerFrame pager = new PagerFrame(c);
+        LinearLayout tools = new LinearLayout(c);
+        tools.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout chatPage = new LinearLayout(c);
+        chatPage.setOrientation(LinearLayout.VERTICAL);
+        pager.addView(tools);
+        pager.addView(chatPage);
+        tabs.setListener(i -> pager.goTo(i, true));
+        pager.setListener(tabs::select);
+        panel.addView(pager, Theme.lp(Theme.MATCH, Theme.WRAP, dp(14)));
 
-        // tiles
+        // ---- page 1: tools
+        tools.addView(heroAction(R.drawable.ic_scan, "Scan question", "Drag to crop \u00B7 Hold to detect", () -> {
+            actions.scan();
+        }), Theme.lp(Theme.MATCH, Theme.WRAP));
+        stagger.add(tools.getChildAt(0));
+
         LinearLayout tiles = new LinearLayout(c);
         tiles.setOrientation(LinearLayout.HORIZONTAL);
         View t1 = tile(R.drawable.ic_keyboard, "Type", actions::type);
@@ -116,12 +99,11 @@ final class MenuPopover {
         tiles.addView(t1, a);
         tiles.addView(t2, b);
         tiles.addView(t3, d);
-        panel.addView(tiles, Theme.lp(Theme.MATCH, Theme.WRAP, dp(8)));
+        tools.addView(tiles, Theme.lp(Theme.MATCH, Theme.WRAP, dp(8)));
         stagger.add(t1);
         stagger.add(t2);
         stagger.add(t3);
 
-        // last answer
         if (last != null) {
             LinearLayout lastRow = new LinearLayout(c);
             lastRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -130,7 +112,7 @@ final class MenuPopover {
             lastRow.setBackground(Theme.rounded(0x0DFFFFFF, dp(18), Theme.HAIRLINE, Math.max(1, dp(0.8f))));
             LinearLayout col = new LinearLayout(c);
             col.setOrientation(LinearLayout.VERTICAL);
-            col.addView(Theme.text(c, "Last answer · " + History.relative(last.time), Theme.Type.OVERLINE));
+            col.addView(Theme.text(c, "Last answer \u00B7 " + History.relative(last.time), Theme.Type.OVERLINE));
             TextView ans = Theme.text(c, last.answer, Theme.Type.CALLOUT);
             ans.setMaxLines(2);
             ans.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -149,8 +131,27 @@ final class MenuPopover {
             LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(dp(36), dp(36));
             cp.leftMargin = dp(10);
             lastRow.addView(copy, cp);
-            panel.addView(lastRow, Theme.lp(Theme.MATCH, Theme.WRAP, dp(8)));
+            tools.addView(lastRow, Theme.lp(Theme.MATCH, Theme.WRAP, dp(8)));
             stagger.add(lastRow);
+        }
+
+        // ---- page 2: chat
+        chatPage.addView(heroAction(R.drawable.ic_message, "New chat",
+                "with " + Prefs.provider(c).label + " \u00B7 saved automatically", () -> actions.chat(null, true)),
+                Theme.lp(Theme.MATCH, Theme.WRAP));
+        java.util.List<Chats.Chat> recent = Chats.list(c);
+        if (recent.isEmpty()) {
+            TextView none = Theme.text(c, "Your chats will show up here. Each one saves itself.", Theme.Type.CAPTION);
+            none.setPadding(dp(6), 0, dp(6), 0);
+            chatPage.addView(none, Theme.lp(Theme.MATCH, Theme.WRAP, dp(14)));
+        } else {
+            TextView label = Theme.text(c, "Recent", Theme.Type.OVERLINE);
+            label.setPadding(dp(6), 0, 0, 0);
+            chatPage.addView(label, Theme.lp(Theme.MATCH, Theme.WRAP, dp(14)));
+            for (int i = 0; i < Math.min(3, recent.size()); i++) {
+                Chats.Chat ch = recent.get(i);
+                chatPage.addView(chatRow(ch, () -> actions.chat(ch.id, false)), Theme.lp(Theme.MATCH, Theme.WRAP, dp(i == 0 ? 8 : 6)));
+            }
         }
 
         root = new FrameLayout(c);
@@ -208,6 +209,67 @@ final class MenuPopover {
             s.animate().alpha(1f).translationY(0).setStartDelay(60 + 35L * i).setDuration(420)
                     .setInterpolator(Theme.DECELERATE).start();
         }
+    }
+
+    private View heroAction(int icon, String title, String sub, Runnable action) {
+        LinearLayout hero = new LinearLayout(c);
+        hero.setOrientation(LinearLayout.HORIZONTAL);
+        hero.setGravity(Gravity.CENTER_VERTICAL);
+        hero.setPadding(dp(12), dp(12), dp(14), dp(12));
+        hero.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x1F000000),
+                Theme.rounded(Theme.WHITE, dp(20)), Theme.rounded(Theme.WHITE, dp(20))));
+        FrameLayout disc = new FrameLayout(c);
+        disc.setBackground(Theme.rounded(Theme.BLACK, dp(21)));
+        disc.addView(Theme.icon(c, icon, Theme.WHITE, 20));
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(42), dp(42));
+        dlp.rightMargin = dp(12);
+        hero.addView(disc, dlp);
+        LinearLayout heroText = new LinearLayout(c);
+        heroText.setOrientation(LinearLayout.VERTICAL);
+        TextView ht = Theme.text(c, title, Theme.Type.TITLE_S);
+        ht.setTextSize(15.5f);
+        ht.setTextColor(Theme.BLACK);
+        TextView hs = Theme.oneLine(Theme.text(c, sub, Theme.Type.LABEL));
+        hs.setTextColor(0x8C000000);
+        heroText.addView(ht);
+        heroText.addView(hs, Theme.lp(Theme.WRAP, Theme.WRAP, dp(3)));
+        hero.addView(heroText, new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
+        hero.addView(Theme.icon(c, R.drawable.ic_chevron_right, 0x66000000, 18));
+        hero.setClickable(true);
+        hero.setOnClickListener(v -> {
+            Theme.tap(v);
+            action.run();
+        });
+        Theme.pressable(hero, 0.97f);
+        return hero;
+    }
+
+    private View chatRow(Chats.Chat ch, Runnable action) {
+        LinearLayout r = new LinearLayout(c);
+        r.setOrientation(LinearLayout.HORIZONTAL);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(dp(12), dp(10), dp(12), dp(10));
+        r.setBackground(Theme.ripple(Theme.rounded(Theme.FILL, dp(16), Theme.HAIRLINE, Math.max(1, dp(0.8f))), dp(16)));
+        FrameLayout ic = new FrameLayout(c);
+        ic.addView(Theme.icon(c, R.drawable.ic_message, Theme.TEXT_2, 17));
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(20), dp(20));
+        ip.rightMargin = dp(12);
+        r.addView(ic, ip);
+        LinearLayout col = new LinearLayout(c);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.addView(Theme.oneLine(Theme.text(c, ch.title.isEmpty() ? "Chat" : ch.title, Theme.Type.CALLOUT)));
+        TextView sub = Theme.oneLine(Theme.text(c, History.relative(ch.updated) + " \u00B7 " + ch.preview(), Theme.Type.LABEL));
+        sub.setTextColor(Theme.TEXT_3);
+        col.addView(sub, Theme.lp(Theme.MATCH, Theme.WRAP, dp(3)));
+        r.addView(col, new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
+        r.setClickable(true);
+        r.setOnClickListener(v -> {
+            Theme.tap(v);
+            action.run();
+        });
+        Theme.pressable(r, 0.97f);
+        return r;
     }
 
     private View statusChip(boolean busy) {

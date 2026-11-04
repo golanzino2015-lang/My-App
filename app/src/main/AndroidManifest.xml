@@ -38,6 +38,14 @@
             android:theme="@style/OverlayTheme"
             android:windowSoftInputMode="adjustResize|stateVisible" />
 
+        <activity
+            android:name=".ChatActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".chat"
+            android:theme="@style/OverlayTheme"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
         <service
             android:name=".BubbleService"
             android:exported="true"

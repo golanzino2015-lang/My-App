@@ -19,6 +19,14 @@ each uses your own API key.
   - **History**: every answer, grouped by day. Tap to copy, long-press to delete.
   - **Settings**.
   - **Last answer**: copy it again with one tap.
+- **Swipe the menu sideways (or tap the Chat tab)** for the **Chat** page: start a new chat or
+  reopen a recent one.
+- **Chat**: a full chat with the AI you picked, in a sheet over whatever app you're in.
+  - Chats save themselves; the list button shows them all (press and hold one to delete it).
+  - **Scan button** next to the message box: the chat steps aside, you crop part of the screen,
+    and it comes back attached. The **photo button** attaches an image from your gallery.
+  - Replies render bold, bullets and code. Tap **Copy** under any reply.
+  - Switch AI from the chat's title. The conversation carries over.
 - **Hold the orb** to start a scan right away.
 - **Status pill** at the top of the screen shows progress, then "Copied to clipboard" with the
   answer. Tap it to dismiss.
@@ -71,7 +79,11 @@ app/src/main/java/com/questionbubble/app/
   OnboardingActivity.java   first-launch flow
   MainActivity.java         home
   HistoryActivity.java      saved answers
-  TypeQuestionActivity.java chat-style ask sheet
+  TypeQuestionActivity.java quick one-off question sheet
+  ChatActivity.java         saved chats with screen capture + gallery images
+  Chats.java / ChatApi.java chat storage; multi-turn requests for all three AIs
+  PagerFrame.java           swipeable Tools / Chat pages in the bubble menu
+  Md.java                   light Markdown rendering for replies
   Sheet.java / Sheets.java  bottom sheets (key, model, confirm, help)
   Theme.java / Fonts.java   colors, Inter type scale, motion, helpers
   PillButton, ToggleView, SegmentedView, Spinner, CheckView, TypingDots, Snack, Rows, KeyField

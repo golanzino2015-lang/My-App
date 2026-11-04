@@ -52,6 +52,21 @@ final class SegmentedView extends View {
         listener = l;
     }
 
+    /** Move the thumb without notifying the listener. */
+    void select(int i) {
+        if (i == selected) return;
+        selected = i;
+        if (anim != null) anim.cancel();
+        anim = ValueAnimator.ofFloat(pos, i);
+        anim.setDuration(420);
+        anim.setInterpolator(new android.view.animation.OvershootInterpolator(0.9f));
+        anim.addUpdateListener(a -> {
+            pos = (float) a.getAnimatedValue();
+            invalidate();
+        });
+        anim.start();
+    }
+
     @Override
     protected void onMeasure(int w, int h) {
         setMeasuredDimension(resolveSize(Theme.dp(getContext(), 240), w), Theme.dp(getContext(), 40));
