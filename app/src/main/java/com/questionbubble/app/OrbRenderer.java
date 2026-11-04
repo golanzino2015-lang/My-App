@@ -44,11 +44,11 @@ final class OrbRenderer {
     private void build(float r) {
         builtR = r;
         Shader.TileMode C = Shader.TileMode.CLAMP;
-        shadow.setShader(new RadialGradient(0, r * 0.2f, r * 1.32f,
+        shadow.setShader(new RadialGradient(0, r * 0.15f, r * 1.25f,
                 new int[]{0x80000000, 0x66000000, 0x00000000}, new float[]{0f, 0.6f, 1f}, C));
-        glow.setShader(new RadialGradient(0, 0, r * 1.45f,
-                new int[]{0x00FFFFFF, 0x00FFFFFF, 0x42FFFFFF, 0x00FFFFFF},
-                new float[]{0f, 0.66f, 0.7f, 1f}, C));
+        glow.setShader(new RadialGradient(0, 0, r * 1.38f,
+                new int[]{0x00FFFFFF, 0x00FFFFFF, 0x45FFFFFF, 0x00FFFFFF},
+                new float[]{0f, 0.69f, 0.73f, 1f}, C));
         body.setShader(new RadialGradient(-0.34f * r, -0.46f * r, 1.7f * r,
                 new int[]{0xFF6E6E6E, 0xFF2E2E2E, 0xFF0E0E0E, 0xFF030303},
                 new float[]{0f, 0.34f, 0.74f, 1f}, C));
@@ -88,10 +88,10 @@ final class OrbRenderer {
         c.save();
         c.translate(cx, cy);
 
-        if (drawShadow) c.drawCircle(0, r * 0.2f, r * 1.32f, shadow);
+        if (drawShadow) c.drawCircle(0, r * 0.15f, r * 1.25f, shadow);
         if (glowA > 0.01f) {
             glow.setAlpha(Math.round(255 * Math.min(1f, glowA)));
-            c.drawCircle(0, 0, r * 1.45f, glow);
+            c.drawCircle(0, 0, r * 1.38f, glow);
         }
 
         c.drawCircle(0, 0, r, body);

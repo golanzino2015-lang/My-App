@@ -69,7 +69,7 @@ public class OnboardingActivity extends Activity {
         g.setShape(GradientDrawable.OVAL);
         glow.setBackground(g);
         stage.addView(glow, new FrameLayout.LayoutParams(dp(440), dp(440), Gravity.CENTER));
-        orb = new OrbView(this, 34);
+        orb = new OrbView(this, 40);
         orb.setGlow(0.35f);
         stage.addView(orb, new FrameLayout.LayoutParams(dp(250), dp(250), Gravity.CENTER));
         stage.setClipChildren(false);
