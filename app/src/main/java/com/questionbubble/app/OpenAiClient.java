@@ -19,6 +19,13 @@ final class OpenAiClient {
     private static final String ENDPOINT = "https://api.openai.com/v1/chat/completions";
     private static final int MAX_IMAGE_SIDE = 2000;
 
+    static final String DETAILED_PROMPT =
+            "You are a fast, accurate question-answering assistant. The user gives you a question, "
+            + "either as text or as a picture of their screen. Start with the answer on its own "
+            + "first line (for multiple choice: the option letter/number and its text). Then add a "
+            + "short explanation of at most two sentences. No markdown, no preamble. If several "
+            + "questions are visible, answer only the one the user indicated.";
+
     static final String SYSTEM_PROMPT =
             "You are a fast, accurate question-answering assistant. The user gives you a question, "
             + "either as text or as a picture of their screen. Reply with ONLY the answer: no "
@@ -27,7 +34,7 @@ final class OpenAiClient {
             + "fill-in-the-blank, give just the missing word(s). If several questions are visible, "
             + "answer only the one the user indicated.";
 
-    static String ask(String apiKey, String model, String text, Bitmap image) throws Exception {
+    static String ask(String apiKey, String model, boolean detailed, String text, Bitmap image) throws Exception {
         if (apiKey == null || apiKey.isEmpty()) {
             throw new Exception("No API key set. Open the app and paste your OpenAI API key.");
         }
@@ -42,7 +49,7 @@ final class OpenAiClient {
         }
 
         JSONArray messages = new JSONArray()
-                .put(new JSONObject().put("role", "system").put("content", SYSTEM_PROMPT))
+                .put(new JSONObject().put("role", "system").put("content", detailed ? DETAILED_PROMPT : SYSTEM_PROMPT))
                 .put(new JSONObject().put("role", "user").put("content", content));
 
         JSONObject body = new JSONObject().put("model", model).put("messages", messages);
@@ -56,22 +63,21 @@ final class OpenAiClient {
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + apiKey);
 
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+            int code;
+            try {
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                }
+                code = conn.getResponseCode();
+            } catch (java.net.UnknownHostException e) {
+                throw new Exception("No internet connection.");
+            } catch (java.net.SocketTimeoutException e) {
+                throw new Exception("The request timed out. Try again.");
             }
-
-            int code = conn.getResponseCode();
             InputStream is = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
             String resp = is == null ? "" : readAll(is);
 
-            if (code >= 400) {
-                String msg = "HTTP " + code;
-                try {
-                    msg = new JSONObject(resp).getJSONObject("error").getString("message");
-                } catch (Exception ignored) {
-                }
-                throw new Exception(msg);
-            }
+            if (code >= 400) throw new Exception(friendlyError(code, resp));
 
             String answer = new JSONObject(resp)
                     .getJSONArray("choices").getJSONObject(0)
@@ -81,6 +87,37 @@ final class OpenAiClient {
         } finally {
             conn.disconnect();
         }
+    }
+
+    /** Checks that a key works by listing models. Throws with a readable message if not. */
+    static void verifyKey(String apiKey) throws Exception {
+        if (apiKey == null || apiKey.trim().isEmpty()) throw new Exception("Enter your API key first.");
+        HttpURLConnection conn = (HttpURLConnection) new URL("https://api.openai.com/v1/models").openConnection();
+        try {
+            conn.setConnectTimeout(15_000);
+            conn.setReadTimeout(20_000);
+            conn.setRequestProperty("Authorization", "Bearer " + apiKey.trim());
+            int code = conn.getResponseCode();
+            if (code >= 400) {
+                InputStream es = conn.getErrorStream();
+                throw new Exception(friendlyError(code, es == null ? "" : readAll(es)));
+            }
+        } catch (java.net.UnknownHostException e) {
+            throw new Exception("No internet connection.");
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    private static String friendlyError(int code, String body) {
+        if (code == 401) return "That API key was rejected. Check it and try again.";
+        if (code == 429) return "Rate limit or quota reached on your OpenAI account.";
+        if (code == 404) return "That model isn't available on your account.";
+        try {
+            return new JSONObject(body).getJSONObject("error").getString("message");
+        } catch (Exception ignored) {
+        }
+        return "OpenAI returned an error (" + code + ").";
     }
 
     private static String toBase64Jpeg(Bitmap src) {

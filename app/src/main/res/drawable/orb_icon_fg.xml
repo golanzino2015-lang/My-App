@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- sphere body -->
+    <path android:pathData="M27,54a27,27 0 1,0 54,0a27,27 0 1,0 -54,0z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="44" android:centerY="41" android:gradientRadius="42">
+                <item android:offset="0" android:color="#FF6A6A6A" />
+                <item android:offset="0.45" android:color="#FF242424" />
+                <item android:offset="1" android:color="#FF050505" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <group>
+        <clip-path android:pathData="M27,54a27,27 0 1,0 54,0a27,27 0 1,0 -54,0z" />
+        <!-- edge shading -->
+        <path android:pathData="M27,54a27,27 0 1,0 54,0a27,27 0 1,0 -54,0z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="radial" android:centerX="54" android:centerY="54" android:gradientRadius="27">
+                    <item android:offset="0" android:color="#00000000" />
+                    <item android:offset="0.7" android:color="#00000000" />
+                    <item android:offset="1" android:color="#AA000000" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- bounce light at the bottom -->
+        <path android:pathData="M39,77a15,15 0 1,0 30,0a15,15 0 1,0 -30,0z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="radial" android:centerX="54" android:centerY="77" android:gradientRadius="15">
+                    <item android:offset="0" android:color="#38FFFFFF" />
+                    <item android:offset="1" android:color="#00FFFFFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- specular highlight -->
+        <path android:pathData="M34,43a11,11 0 1,0 22,0a11,11 0 1,0 -22,0z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="radial" android:centerX="45" android:centerY="43" android:gradientRadius="11">
+                    <item android:offset="0" android:color="#B3FFFFFF" />
+                    <item android:offset="1" android:color="#00FFFFFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+    <!-- rim -->
+    <path android:pathData="M27.5,54a26.5,26.5 0 1,0 53.0,0a26.5,26.5 0 1,0 -53.0,0z" android:strokeWidth="1" android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="54" android:startY="27" android:endX="54" android:endY="81">
+                <item android:offset="0" android:color="#73FFFFFF" />
+                <item android:offset="1" android:color="#14FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

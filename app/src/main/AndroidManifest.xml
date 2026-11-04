@@ -5,13 +5,16 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/ic_launcher"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/AppTheme">
 
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -19,12 +22,21 @@
         </activity>
 
         <activity
+            android:name=".OnboardingActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".HistoryActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".TypeQuestionActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity=".typequestion"
-            android:theme="@style/DialogTheme"
-            android:windowSoftInputMode="stateVisible|adjustResize" />
+            android:theme="@style/OverlayTheme"
+            android:windowSoftInputMode="adjustResize|stateVisible" />
 
         <service
             android:name=".BubbleService"

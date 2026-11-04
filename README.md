@@ -1,58 +1,70 @@
 # Question Bubble (Android)
 
-A floating bubble that sits on top of every app. Tap it to open a small menu:
+A floating orb that sits on top of every app. Point it at a question on your screen and the answer
+from ChatGPT lands on your clipboard.
 
-| Button | What it does |
-|---|---|
-| **Select Question** | Freezes the screen. **Drag a box** around a question, **or long-press** the question and it auto-detects the block your finger is on. The image goes to ChatGPT and the answer is **copied to your clipboard**. |
-| **Type Question** | A small pop-up where you type a question. The answer is shown and copied to your clipboard. |
-| **Settings** | Opens the app (permission status, API key, model). |
+## Features
 
-Drag the bubble and it snaps to the nearest edge (or corner, near the top/bottom). Tap it again, or anywhere else, to close the menu.
+- **The orb** is a black glass sphere drawn in code, with drifting inner light and a rim highlight.
+  - Drag it with spring physics. Fling it to either side and it snaps to the nearest edge, or into
+    a corner near the top or bottom.
+  - Drag it onto the **X** at the bottom of the screen to hide it.
+  - It dims when idle and lights up while it's working.
+  - When an answer arrives it sends out a ripple.
+- **Tap the orb** to open the menu:
+  - **Scan question**: the screen freezes. Drag a box around the question, press and hold on it
+    until the ring fills to auto-detect it, or tap **Full screen**.
+  - **Type**: a chat-style panel slides up over the current app.
+  - **History**: every answer, grouped by day. Tap to copy, long-press to delete.
+  - **Settings**.
+  - **Last answer**: copy it again with one tap.
+- **Hold the orb** to start a scan right away.
+- **Status pill** at the top of the screen shows progress, then "Copied to clipboard" with the
+  answer. Tap it to dismiss.
+- **First-launch onboarding**: welcome, permission (detected live), API key (verified with OpenAI).
+- **Home screen**:
+  - Bubble on/off switch and today's stats.
+  - Recent answers.
+  - Model picker, Short / Detailed answer style, bubble size, haptics.
+- Typeface: **Inter** (bundled, SIL Open Font License, see `FONT_LICENSE_Inter.txt`).
 
-## Get the APK (no converter needed)
+## Get the APK
 
-This is a native Android project, so it builds directly into an APK:
+1. On GitHub open **Actions → Build APK** and open the latest green run.
+2. Download the **QuestionBubble-apk** artifact and unzip it to get `app-debug.apk`.
+3. Install it on your phone.
 
-1. On GitHub open **Actions → Build APK** and click the latest green run
-   (or **Run workflow** to start one).
-2. Download the **QuestionBubble-apk** artifact (a zip) and unzip it to get `app-debug.apk`.
-3. Copy it to your phone and open it. Allow "install unknown apps" if asked.
+Or open the folder in **Android Studio** and press Run.
 
-Or open the folder in **Android Studio** and press ▶ Run.
+## Setup on the phone
 
-## First-time setup on the phone
+The app walks you through this the first time you open it:
 
-1. Open **Question Bubble**. It shows that permission is needed. Tap **Open settings**.
-2. In Accessibility → *Installed/Downloaded apps* → **Question Bubble** → turn it **on**.
-   (This is the same kind of permission auto-clickers use.)
-   - **Android 13+ greyed out / "Restricted setting"?** Go to *Settings → Apps → Question Bubble →
-     ⋮ (top-right) → Allow restricted settings*, then try again. The app has a button for this.
-3. Back in the app, paste your **OpenAI API key** and tap **Save**.
-   The key is stored only on your phone and only sent to `api.openai.com`.
-4. The green bubble appears. Done.
+1. **Allow screen access.** Accessibility → Question Bubble → on.
+   - If the switch is greyed out (Android 13 and newer), go to *Settings → Apps → Question Bubble
+     → ⋮ → Allow restricted settings*.
+2. **Paste your OpenAI API key.** It's stored only on the phone and only sent to `api.openai.com`.
 
-To hide the bubble, turn Question Bubble off in Accessibility settings.
-
-## Notes
-
-- Needs **Android 11 or newer** (that's when apps got the screenshot ability used here).
-- Default model is `gpt-4o`. You can change it in the app to any OpenAI model that accepts images.
-- Each question costs a small amount on your OpenAI account.
+Requires Android 11 or newer.
 
 ## Code layout
 
 ```
 app/src/main/java/com/questionbubble/app/
-  BubbleService.java        floating bubble, menu, screenshots, auto-detect, clipboard
-  SelectionView.java        full-screen crop / long-press overlay
-  OpenAiClient.java         calls the OpenAI Chat Completions API
-  TypeQuestionActivity.java the "Type Question" pop-up
-  MainActivity.java         permission + API-key screen
-  Ui.java                   colors, fonts, buttons, inputs, dialogs, animations
-  ShineDrawable.java        glass panel with the moving shine outline
-  BubbleView.java           the bubble graphic + loading ring
-  Notice.java               top-of-screen notifications
-  SpinnerView.java          loading spinner
-  Prefs.java                saved settings
+  BubbleService.java        accessibility service: overlay, scan, answer flow
+  FloatingBubble.java       orb window: drag, spring, fling, snapping, idle dim
+  DismissTarget.java        drop-to-hide target
+  MenuPopover.java          the menu that grows out of the orb
+  Island.java               top-of-screen status pill
+  SelectionView.java        scan overlay (crop, hold-to-detect, full screen)
+  OrbRenderer.java/OrbView  the animated orb
+  OnboardingActivity.java   first-launch flow
+  MainActivity.java         home
+  HistoryActivity.java      saved answers
+  TypeQuestionActivity.java chat-style ask sheet
+  Sheet.java / Sheets.java  bottom sheets (key, model, confirm, help)
+  Theme.java / Fonts.java   colors, Inter type scale, motion, helpers
+  PillButton, ToggleView, SegmentedView, Spinner, CheckView, TypingDots, Snack, Rows, KeyField
+  OpenAiClient.java         OpenAI API (answers + key check)
+  History.java / Prefs.java storage
 ```
