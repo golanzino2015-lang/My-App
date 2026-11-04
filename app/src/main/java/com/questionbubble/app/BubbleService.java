@@ -400,13 +400,11 @@ public class BubbleService extends AccessibilityService {
     private void ask(Bitmap image, String prompt) {
         busy = true;
         bubble.setBusy(true);
-        island.show(Island.Kind.LOADING, "Reading the question", "Asking " + Prefs.model(this), 0);
-        String key = Prefs.apiKey(this);
-        String model = Prefs.model(this);
+        island.show(Island.Kind.LOADING, "Reading the question", "Asking " + Prefs.provider(this).label, 0);
         boolean detailed = Prefs.detailed(this);
         worker.execute(() -> {
             try {
-                String answer = OpenAiClient.ask(key, model, detailed, prompt, image);
+                String answer = Ai.ask(this, detailed, prompt, image);
                 History.add(this, "scan", "", answer);
                 main.post(() -> {
                     copy(answer);
@@ -437,7 +435,7 @@ public class BubbleService extends AccessibilityService {
 
     private boolean checkKey() {
         if (!Prefs.apiKey(this).isEmpty()) return true;
-        island.show(Island.Kind.INFO, "Add your OpenAI key", "Opening Question Bubble", 3000);
+        island.show(Island.Kind.INFO, "Add your " + Prefs.provider(this).label + " key", "Opening Question Bubble", 3000);
         openApp();
         return false;
     }

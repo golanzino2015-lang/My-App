@@ -125,11 +125,11 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(20), dp(20));
             ip.rightMargin = dp(12);
             warn.addView(ic, ip);
-            warn.addView(Theme.text(this, "Add your OpenAI key to start", Theme.Type.CALLOUT),
+            warn.addView(Theme.text(this, "Add your " + Prefs.provider(this).label + " key to start", Theme.Type.CALLOUT),
                     new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
             warn.addView(Rows.value(this, null));
             warn.setClickable(true);
-            warn.setOnClickListener(v -> Sheets.apiKey(this, this::render));
+            warn.setOnClickListener(v -> Sheets.apiKey(this, Prefs.provider(this), this::render));
             hero.addView(warn, Theme.lp(Theme.MATCH, Theme.WRAP, dp(16)));
         }
         add(hero, 20, step++);
@@ -170,8 +170,11 @@ public class MainActivity extends Activity {
         // ---- settings
         add(Rows.section(this, "Answers"), 30, step++);
         LinearLayout ai = Rows.group(this);
-        Rows.add(ai, Rows.row(this, R.drawable.ic_key, "API key", null, Rows.value(this, Prefs.maskedKey(this)),
-                () -> Sheets.apiKey(this, this::render)));
+        Provider provider = Prefs.provider(this);
+        Rows.add(ai, Rows.row(this, R.drawable.ic_bot, "AI", null, Rows.value(this, provider.label),
+                () -> Sheets.provider(this, this::render)));
+        Rows.add(ai, Rows.row(this, R.drawable.ic_key, provider.label + " key", null, Rows.value(this, Prefs.maskedKey(this)),
+                () -> Sheets.apiKey(this, provider, this::render)));
         Rows.add(ai, Rows.row(this, R.drawable.ic_cpu, "Model", null, Rows.value(this, Prefs.model(this)),
                 () -> Sheets.model(this, this::render)));
         LinearLayout styleRow = Rows.row(this, R.drawable.ic_sparkles, "Answer style",

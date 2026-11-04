@@ -120,7 +120,7 @@ final class OpenAiClient {
         return "OpenAI returned an error (" + code + ").";
     }
 
-    private static String toBase64Jpeg(Bitmap src) {
+    static String toBase64Jpeg(Bitmap src) {
         Bitmap bmp = src;
         int max = Math.max(src.getWidth(), src.getHeight());
         if (max > MAX_IMAGE_SIDE) {

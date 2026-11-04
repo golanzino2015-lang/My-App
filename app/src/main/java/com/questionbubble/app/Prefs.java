@@ -7,8 +7,6 @@ import android.content.SharedPreferences;
 final class Prefs {
 
     static final String FILE = "settings";
-    static final String DEFAULT_MODEL = "gpt-4o";
-
     static final String K_API_KEY = "api_key";
     static final String K_MODEL = "model";
     static final String K_STYLE = "style";          // "short" | "detailed"
@@ -21,21 +19,58 @@ final class Prefs {
         return c.getApplicationContext().getSharedPreferences(FILE, Context.MODE_PRIVATE);
     }
 
+    static final String K_PROVIDER = "provider";
+
+    /** Copies settings saved before multi-AI support into the ChatGPT slots (runs once). */
+    private static void migrate(SharedPreferences p) {
+        if (p.getBoolean("migrated_v2", false)) return;
+        SharedPreferences.Editor e = p.edit();
+        String oldKey = p.getString("api_key", "");
+        if (!oldKey.isEmpty() && !p.contains("api_key_openai")) e.putString("api_key_openai", oldKey);
+        String oldModel = p.getString("model", "");
+        if (!oldModel.isEmpty() && !p.contains("model_openai")) e.putString("model_openai", oldModel);
+        e.putBoolean("migrated_v2", true).apply();
+    }
+
+    static Provider provider(Context c) {
+        SharedPreferences p = sp(c);
+        migrate(p);
+        return Provider.fromId(p.getString(K_PROVIDER, Provider.OPENAI.id));
+    }
+
+    static void setProvider(Context c, Provider pr) {
+        sp(c).edit().putString(K_PROVIDER, pr.id).apply();
+    }
+
+    /** Key for the AI currently selected. */
     static String apiKey(Context c) {
-        return sp(c).getString(K_API_KEY, "").trim();
+        return apiKey(c, provider(c));
     }
 
-    static void setApiKey(Context c, String key) {
-        sp(c).edit().putString(K_API_KEY, key.trim()).apply();
+    static String apiKey(Context c, Provider pr) {
+        SharedPreferences p = sp(c);
+        migrate(p);
+        return p.getString("api_key_" + pr.id, "").trim();
     }
 
+    static void setApiKey(Context c, Provider pr, String key) {
+        sp(c).edit().putString("api_key_" + pr.id, key.trim()).apply();
+    }
+
+    /** Model for the AI currently selected. */
     static String model(Context c) {
-        String m = sp(c).getString(K_MODEL, "").trim();
-        return m.isEmpty() ? DEFAULT_MODEL : m;
+        return model(c, provider(c));
     }
 
-    static void setModel(Context c, String m) {
-        sp(c).edit().putString(K_MODEL, m.trim()).apply();
+    static String model(Context c, Provider pr) {
+        SharedPreferences p = sp(c);
+        migrate(p);
+        String m = p.getString("model_" + pr.id, "").trim();
+        return m.isEmpty() ? pr.defaultModel : m;
+    }
+
+    static void setModel(Context c, Provider pr, String m) {
+        sp(c).edit().putString("model_" + pr.id, m.trim()).apply();
     }
 
     static boolean detailed(Context c) {
@@ -89,7 +124,11 @@ final class Prefs {
 
     /** "sk-...a1b2" style preview of the saved key. */
     static String maskedKey(Context c) {
-        String k = apiKey(c);
+        return maskedKey(c, provider(c));
+    }
+
+    static String maskedKey(Context c, Provider pr) {
+        String k = apiKey(c, pr);
         if (k.isEmpty()) return "Not set";
         String tail = k.length() > 4 ? k.substring(k.length() - 4) : k;
         return "•••• " + tail;

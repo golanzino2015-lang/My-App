@@ -80,6 +80,10 @@ final class KeyField extends LinearLayout {
         addView(status, Theme.lp(Theme.MATCH, Theme.WRAP, Theme.dp(c, 10)));
     }
 
+    void setHint(String hint) {
+        input.setHint(hint);
+    }
+
     String text() {
         return input.getText().toString().trim();
     }

@@ -78,7 +78,7 @@ public class TypeQuestionActivity extends Activity {
         titles.addView(Theme.text(this, "Ask anything", Theme.Type.TITLE));
         LinearLayout chips = new LinearLayout(this);
         chips.setOrientation(LinearLayout.HORIZONTAL);
-        chips.addView(chip(Prefs.model(this), null));
+        chips.addView(chip(Prefs.provider(this).label + " \u00B7 " + Prefs.model(this), null));
         TextView styleChip = chip(Prefs.detailed(this) ? "Detailed" : "Short", null);
         styleChip.setOnClickListener(v -> {
             boolean d = !Prefs.detailed(this);
@@ -225,14 +225,12 @@ public class TypeQuestionActivity extends Activity {
             answerCard.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(420).setInterpolator(Theme.DECELERATE).start();
         }
 
-        String key = Prefs.apiKey(this);
-        String model = Prefs.model(this);
         boolean detailed = Prefs.detailed(this);
         worker.execute(() -> {
             String result;
             boolean ok;
             try {
-                result = OpenAiClient.ask(key, model, detailed, "Question: " + q, null);
+                result = Ai.ask(this, detailed, "Question: " + q, null);
                 History.add(this, "type", q, result);
                 ok = true;
             } catch (Exception e) {

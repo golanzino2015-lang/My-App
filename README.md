@@ -1,7 +1,8 @@
 # Question Bubble (Android)
 
 A floating orb that sits on top of every app. Point it at a question on your screen and the answer
-from ChatGPT lands on your clipboard.
+lands on your clipboard. Choose **ChatGPT** (OpenAI), **Claude** (Anthropic) or **Gemini** (Google);
+each uses your own API key.
 
 ## Features
 
@@ -22,6 +23,11 @@ from ChatGPT lands on your clipboard.
 - **Status pill** at the top of the screen shows progress, then "Copied to clipboard" with the
   answer. Tap it to dismiss.
 - **First-launch onboarding**: welcome, permission (detected live), API key (verified with OpenAI).
+- **Choose your AI**: ChatGPT, Claude or Gemini, each with its own key (checked when you save it)
+  and its own model list, plus a custom model name.
+  - Claude uses the official Anthropic Java SDK, with Claude Opus 5.5 as the default model. If
+    Claude's safety check declines a question, the request is retried automatically on another
+    Claude model (server-side fallback).
 - **Home screen**:
   - Bubble on/off switch and today's stats.
   - Recent answers.
@@ -43,7 +49,11 @@ The app walks you through this the first time you open it:
 1. **Allow screen access.** Accessibility → Question Bubble → on.
    - If the switch is greyed out (Android 13 and newer), go to *Settings → Apps → Question Bubble
      → ⋮ → Allow restricted settings*.
-2. **Paste your OpenAI API key.** It's stored only on the phone and only sent to `api.openai.com`.
+2. **Choose your AI and paste its API key.** Keys are stored only on the phone and only sent to
+   that company's API.
+   - ChatGPT: platform.openai.com/api-keys
+   - Claude: console.anthropic.com/settings/keys
+   - Gemini: aistudio.google.com/apikey
 
 Requires Android 11 or newer.
 
@@ -65,6 +75,9 @@ app/src/main/java/com/questionbubble/app/
   Sheet.java / Sheets.java  bottom sheets (key, model, confirm, help)
   Theme.java / Fonts.java   colors, Inter type scale, motion, helpers
   PillButton, ToggleView, SegmentedView, Spinner, CheckView, TypingDots, Snack, Rows, KeyField
-  OpenAiClient.java         OpenAI API (answers + key check)
+  Ai.java / Provider.java   picks the AI; provider list, models, key links
+  OpenAiClient.java         ChatGPT (OpenAI API)
+  ClaudeClient.java         Claude (official Anthropic Java SDK)
+  GeminiClient.java         Gemini (Google Generative Language API)
   History.java / Prefs.java storage
 ```

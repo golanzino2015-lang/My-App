@@ -24,4 +24,22 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    packaging {
+        resources {
+            excludes += [
+                    'META-INF/versions/**/module-info.class',
+                    'META-INF/DEPENDENCIES',
+                    'META-INF/INDEX.LIST',
+                    'META-INF/LICENSE*',
+                    'META-INF/NOTICE*',
+                    'META-INF/*.md',
+            ]
+        }
+    }
+}
+
+dependencies {
+    // Official Anthropic SDK, used for Claude
+    implementation 'com.anthropic:anthropic-java:3.2.0'
 }

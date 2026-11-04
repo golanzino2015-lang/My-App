@@ -43,6 +43,7 @@ public class OnboardingActivity extends Activity {
     private boolean accessShownGranted;
     // page 2
     private KeyField keyField;
+    private Provider chosen;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -241,11 +242,12 @@ public class OnboardingActivity extends Activity {
             keyField.setError("Paste your API key first.");
             return;
         }
+        Provider provider = chosen;
         primary.setLoading(true);
         Executors.newSingleThreadExecutor().execute(() -> {
             String err = null;
             try {
-                OpenAiClient.verifyKey(key);
+                Ai.verify(provider, key);
             } catch (Exception e) {
                 err = e.getMessage();
             }
@@ -256,8 +258,9 @@ public class OnboardingActivity extends Activity {
                 if (error != null) {
                     keyField.setError(error);
                 } else {
-                    Prefs.setApiKey(this, key);
-                    keyField.setOk("Key verified. You're connected.");
+                    Prefs.setApiKey(this, provider, key);
+                    Prefs.setProvider(this, provider);
+                    keyField.setOk("Key verified. " + provider.label + " is connected.");
                     Theme.confirm(keyField);
                     orb.ripple();
                     main.postDelayed(() -> goTo(3, true), 700);
@@ -305,7 +308,7 @@ public class OnboardingActivity extends Activity {
                 parts.add(add(p, Theme.text(this, "Turn on Question Bubble in Accessibility, the same permission auto-clickers use.", Theme.Type.BODY), 10));
                 parts.add(add(p, feature(R.drawable.ic_layers, "Floats over every app", "Reach it from anywhere"), 22));
                 parts.add(add(p, feature(R.drawable.ic_scan, "Sees only what you select", "Nothing is captured until you scan"), 14));
-                parts.add(add(p, feature(R.drawable.ic_lock, "Private by design", "Images go only to OpenAI, with your key"), 14));
+                parts.add(add(p, feature(R.drawable.ic_lock, "Private by design", "Images go only to the AI you pick, with your key"), 14));
                 grantedRow = new LinearLayout(this);
                 grantedRow.setOrientation(LinearLayout.HORIZONTAL);
                 grantedRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -321,22 +324,36 @@ public class OnboardingActivity extends Activity {
                 break;
             }
             case 2: {
+                chosen = Prefs.provider(this);
                 parts.add(add(p, Theme.text(this, "Step 2 of 2", Theme.Type.OVERLINE), 0));
-                parts.add(add(p, Theme.text(this, "Connect OpenAI", Theme.Type.HEADLINE), 12));
-                parts.add(add(p, Theme.text(this, "Paste your API key. It stays on this phone and is only sent to OpenAI.", Theme.Type.BODY), 10));
+                parts.add(add(p, Theme.text(this, "Choose your AI", Theme.Type.HEADLINE), 12));
+                TextView body = Theme.text(this, "", Theme.Type.BODY);
+                parts.add(add(p, body, 10));
+                Provider[] all = Provider.values();
+                String[] names = new String[all.length];
+                for (int i = 0; i < all.length; i++) names[i] = all[i].label;
+                SegmentedView picker = new SegmentedView(this, names, chosen.ordinal());
+                parts.add(add(p, picker, 20));
                 keyField = new KeyField(this);
-                keyField.setText(Prefs.apiKey(this));
-                parts.add(add(p, keyField, 22));
-                TextView link = Theme.text(this, "Get a key at platform.openai.com", Theme.Type.LABEL);
+                parts.add(add(p, keyField, 12));
+                TextView link = Theme.text(this, "", Theme.Type.LABEL);
                 link.setPaintFlags(link.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG);
                 link.setPadding(dp(6), dp(4), 0, dp(4));
-                link.setOnClickListener(v -> {
-                    try {
-                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://platform.openai.com/api-keys")));
-                    } catch (Exception ignored) {
-                    }
-                });
+                link.setOnClickListener(v -> Sheets.openUrl(this, chosen.keyUrl));
                 parts.add(add(p, link, 4));
+                Runnable apply = () -> {
+                    body.setText("Paste your " + chosen.label + " API key. It stays on this phone and is only sent to "
+                            + chosen.company + ".");
+                    keyField.setHint(chosen.keyHint);
+                    keyField.setText(Prefs.apiKey(this, chosen));
+                    keyField.clearStatus();
+                    link.setText("Get a key at " + chosen.keySite);
+                };
+                apply.run();
+                picker.setListener(i -> {
+                    chosen = all[i];
+                    apply.run();
+                });
                 break;
             }
             default: {
