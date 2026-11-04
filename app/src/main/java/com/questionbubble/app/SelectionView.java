@@ -35,8 +35,11 @@ final class SelectionView extends View {
     private final Paint dimPaint = new Paint();
     private final Paint boxPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint detectPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint handlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint titlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint pillStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final int[] loc = new int[2];
     private float startX, startY, curX, curY;
@@ -59,17 +62,30 @@ final class SelectionView extends View {
         this.density = ctx.getResources().getDisplayMetrics().density;
         this.touchSlop = ViewConfiguration.get(ctx).getScaledTouchSlop();
 
-        dimPaint.setColor(0x99000000);
+        dimPaint.setColor(0xB8000000);
         boxPaint.setStyle(Paint.Style.STROKE);
-        boxPaint.setStrokeWidth(3 * density);
-        boxPaint.setColor(0xFF10A37F);
+        boxPaint.setStrokeWidth(1.5f * density);
+        boxPaint.setColor(0xCCFFFFFF);
         detectPaint.setStyle(Paint.Style.STROKE);
-        detectPaint.setStrokeWidth(4 * density);
-        detectPaint.setColor(0xFFFFC107);
-        textPaint.setColor(Color.WHITE);
-        textPaint.setTextSize(14 * density);
+        detectPaint.setStrokeWidth(2f * density);
+        detectPaint.setColor(Color.WHITE);
+        handlePaint.setStyle(Paint.Style.STROKE);
+        handlePaint.setStrokeWidth(3.5f * density);
+        handlePaint.setStrokeCap(Paint.Cap.ROUND);
+        handlePaint.setColor(Color.WHITE);
+        titlePaint.setColor(Ui.DIM);
+        titlePaint.setTextSize(10.5f * density);
+        titlePaint.setLetterSpacing(0.14f);
+        titlePaint.setTypeface(Ui.font(700));
+        titlePaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setColor(Ui.TEXT);
+        textPaint.setTextSize(13.5f * density);
+        textPaint.setTypeface(Ui.font(500));
         textPaint.setTextAlign(Paint.Align.CENTER);
-        pillPaint.setColor(0xDD202124);
+        pillPaint.setColor(0xF0141414);
+        pillStroke.setStyle(Paint.Style.STROKE);
+        pillStroke.setStrokeWidth(1f * density);
+        pillStroke.setColor(Ui.SEP);
     }
 
     /** Briefly highlight the area that was auto-detected. */
@@ -91,31 +107,51 @@ final class SelectionView extends View {
         Rect sel = detected != null ? detected : (dragging ? currentRect() : null);
         if (sel != null) {
             canvas.drawBitmap(shot, sel, sel, null); // un-dimmed inside the box
-            canvas.drawRect(sel, detected != null ? detectPaint : boxPaint);
+            float rr = 6 * density;
+            canvas.drawRoundRect(new RectF(sel), rr, rr, detected != null ? detectPaint : boxPaint);
+            drawHandles(canvas, sel);
         }
         canvas.restore();
 
-        // Hint pill at the top.
+        // Hint card at the top.
         float cx = getWidth() / 2f;
-        float top = 48 * density;
-        String l1 = "Drag a box around the question";
-        String l2 = "or long-press the question to auto-detect";
-        float w = Math.max(textPaint.measureText(l1), textPaint.measureText(l2)) + 32 * density;
-        RectF pill = new RectF(cx - w / 2, top, cx + w / 2, top + 56 * density);
+        float top = 52 * density;
+        String head = detected != null ? "QUESTION DETECTED" : "SELECT QUESTION";
+        String line = detected != null ? "Sending to ChatGPT" : "Drag to crop  \u00B7  Hold to auto-detect";
+        float w = Math.max(textPaint.measureText(line), titlePaint.measureText(head)) + 40 * density;
+        RectF pill = new RectF(cx - w / 2, top, cx + w / 2, top + 58 * density);
         canvas.drawRoundRect(pill, 16 * density, 16 * density, pillPaint);
-        canvas.drawText(l1, cx, top + 23 * density, textPaint);
-        canvas.drawText(l2, cx, top + 44 * density, textPaint);
+        canvas.drawRoundRect(pill, 16 * density, 16 * density, pillStroke);
+        canvas.drawText(head, cx, top + 22 * density, titlePaint);
+        canvas.drawText(line, cx, top + 43 * density, textPaint);
 
         // Cancel button (bottom centre).
-        RectF c = cancelRect();
-        canvas.drawRoundRect(c, 24 * density, 24 * density, pillPaint);
-        canvas.drawText("✕  Cancel", c.centerX(), c.centerY() + 5 * density, textPaint);
+        if (detected == null) {
+            RectF c = cancelRect();
+            canvas.drawRoundRect(c, c.height() / 2, c.height() / 2, pillPaint);
+            canvas.drawRoundRect(c, c.height() / 2, c.height() / 2, pillStroke);
+            canvas.drawText("Cancel", c.centerX(), c.centerY() + 5 * density, textPaint);
+        }
+    }
+
+    /** L-shaped white corner handles. */
+    private void drawHandles(Canvas canvas, Rect r) {
+        float len = Math.min(18 * density, Math.min(r.width(), r.height()) / 3f);
+        float l = r.left, t = r.top, ri = r.right, b = r.bottom;
+        canvas.drawLine(l, t, l + len, t, handlePaint);
+        canvas.drawLine(l, t, l, t + len, handlePaint);
+        canvas.drawLine(ri, t, ri - len, t, handlePaint);
+        canvas.drawLine(ri, t, ri, t + len, handlePaint);
+        canvas.drawLine(l, b, l + len, b, handlePaint);
+        canvas.drawLine(l, b, l, b - len, handlePaint);
+        canvas.drawLine(ri, b, ri - len, b, handlePaint);
+        canvas.drawLine(ri, b, ri, b - len, handlePaint);
     }
 
     private RectF cancelRect() {
         float cx = getWidth() / 2f;
-        float bottom = getHeight() - 64 * density;
-        return new RectF(cx - 70 * density, bottom - 48 * density, cx + 70 * density, bottom);
+        float bottom = getHeight() - 72 * density;
+        return new RectF(cx - 64 * density, bottom - 46 * density, cx + 64 * density, bottom);
     }
 
     private Rect currentRect() {

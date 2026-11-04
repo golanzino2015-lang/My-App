@@ -4,11 +4,11 @@ A floating bubble that sits on top of every app. Tap it to open a small menu:
 
 | Button | What it does |
 |---|---|
-| **📷 Select Question** | Freezes the screen. **Drag a box** around a question, **or long-press** the question and it auto-detects the block your finger is on. The image goes to ChatGPT and the answer is **copied to your clipboard**. |
-| **⌨️ Type Question** | A small pop-up where you type a question. The answer is shown and copied to your clipboard. |
-| **⚙️ Settings** | Opens the app (permission status, API key, model). |
+| **Select Question** | Freezes the screen. **Drag a box** around a question, **or long-press** the question and it auto-detects the block your finger is on. The image goes to ChatGPT and the answer is **copied to your clipboard**. |
+| **Type Question** | A small pop-up where you type a question. The answer is shown and copied to your clipboard. |
+| **Settings** | Opens the app (permission status, API key, model). |
 
-Drag the bubble to move it. Tap it again to close the menu.
+Drag the bubble and it snaps to the nearest edge (or corner, near the top/bottom). Tap it again, or anywhere else, to close the menu.
 
 ## Get the APK (no converter needed)
 
@@ -49,5 +49,10 @@ app/src/main/java/com/questionbubble/app/
   OpenAiClient.java         calls the OpenAI Chat Completions API
   TypeQuestionActivity.java the "Type Question" pop-up
   MainActivity.java         permission + API-key screen
+  Ui.java                   colors, fonts, buttons, inputs, dialogs, animations
+  ShineDrawable.java        glass panel with the moving shine outline
+  BubbleView.java           the bubble graphic + loading ring
+  Notice.java               top-of-screen notifications
+  SpinnerView.java          loading spinner
   Prefs.java                saved settings
 ```

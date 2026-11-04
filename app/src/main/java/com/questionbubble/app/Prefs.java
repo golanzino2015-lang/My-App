@@ -27,5 +27,14 @@ final class Prefs {
                 .apply();
     }
 
+    static int[] bubblePos(Context c) {
+        SharedPreferences p = sp(c);
+        return new int[]{p.getInt("bubble_x", Integer.MIN_VALUE), p.getInt("bubble_y", Integer.MIN_VALUE)};
+    }
+
+    static void saveBubblePos(Context c, int x, int y) {
+        sp(c).edit().putInt("bubble_x", x).putInt("bubble_y", y).apply();
+    }
+
     private Prefs() {}
 }

@@ -1,123 +1,196 @@
 package com.questionbubble.app;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.ComponentName;
 import android.content.Intent;
-import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.text.InputType;
-import android.util.TypedValue;
 import android.view.Gravity;
-import android.widget.Button;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
-/** Setup screen: asks for the accessibility permission and stores the API key. */
+/** Home screen: access status, API key, and a short guide. */
 public class MainActivity extends Activity {
 
-    private TextView status;
-    private Button grantButton;
+    private TextView statusTitle, statusSub, accessButton;
+    private View statusDot;
     private boolean askedThisLaunch;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT, WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
 
-        int pad = dp(20);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(pad, pad, pad, pad);
+        root.setPadding(dp(20), dp(36), dp(20), dp(28));
 
-        TextView title = new TextView(this);
-        title.setText("Question Bubble");
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
-        title.setTextColor(Color.WHITE);
-        root.addView(title);
+        // ---- header
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.ic_launcher);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(48), dp(48));
+        lp.rightMargin = dp(14);
+        header.addView(logo, lp);
+        LinearLayout titles = new LinearLayout(this);
+        titles.setOrientation(LinearLayout.VERTICAL);
+        titles.addView(Ui.text(this, "Question Bubble", 22, 700, Ui.TEXT));
+        titles.addView(Ui.text(this, "Answers from your screen, one tap away.", 13, 400, Ui.DIM),
+                Ui.lp(WRAP, WRAP, dp(5)));
+        header.addView(titles);
+        root.addView(header);
 
-        status = new TextView(this);
-        status.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-        status.setPadding(0, dp(12), 0, dp(12));
-        root.addView(status);
+        // ---- access card
+        LinearLayout access = card();
+        access.addView(Ui.label(this, "Access"));
+        LinearLayout statusRow = new LinearLayout(this);
+        statusRow.setOrientation(LinearLayout.HORIZONTAL);
+        statusRow.setGravity(Gravity.CENTER_VERTICAL);
+        statusDot = new View(this);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(10), dp(10));
+        dlp.rightMargin = dp(10);
+        statusRow.addView(statusDot, dlp);
+        statusTitle = Ui.text(this, "", 16, 600, Ui.TEXT);
+        statusRow.addView(statusTitle);
+        access.addView(statusRow, Ui.lp(MATCH, WRAP, dp(14)));
+        statusSub = Ui.text(this, "", 13, 400, Ui.DIM);
+        statusSub.setLineSpacing(dp(3), 1f);
+        access.addView(statusSub, Ui.lp(MATCH, WRAP, dp(8)));
+        accessButton = Ui.primaryButton(this, "Grant access");
+        accessButton.setOnClickListener(v -> openAccessibilitySettings());
+        access.addView(accessButton, Ui.lp(MATCH, WRAP, dp(16)));
+        TextView greyed = Ui.text(this, "Switch greyed out?", 12.5f, 500, Ui.DIM);
+        greyed.setGravity(Gravity.CENTER);
+        greyed.setPadding(0, dp(12), 0, dp(2));
+        greyed.setOnClickListener(v -> showRestrictedHelp());
+        access.addView(greyed, Ui.lp(MATCH, WRAP, 0));
+        root.addView(access, Ui.lp(MATCH, WRAP, dp(24)));
 
-        grantButton = new Button(this);
-        grantButton.setText("1. Give permission (Accessibility)");
-        grantButton.setOnClickListener(v -> openAccessibilitySettings());
-        root.addView(grantButton);
-
-        Button restricted = new Button(this);
-        restricted.setText("Permission greyed out? Allow restricted settings");
-        restricted.setOnClickListener(v -> showRestrictedHelp());
-        root.addView(restricted);
-
-        root.addView(label("2. OpenAI API key"));
-        EditText keyInput = new EditText(this);
-        keyInput.setHint("sk-...");
-        keyInput.setSingleLine(true);
-        keyInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        // ---- OpenAI card
+        LinearLayout ai = card();
+        ai.addView(Ui.label(this, "OpenAI"));
+        ai.addView(Ui.text(this, "API key", 13, 500, Ui.DIM), Ui.lp(WRAP, WRAP, dp(14)));
+        EditText keyInput = Ui.input(this, "sk-...", true);
         keyInput.setText(Prefs.apiKey(this));
-        root.addView(keyInput);
-
-        root.addView(label("Model (needs image support)"));
-        EditText modelInput = new EditText(this);
+        ai.addView(keyInput, Ui.lp(MATCH, WRAP, dp(8)));
+        ai.addView(Ui.text(this, "Model", 13, 500, Ui.DIM), Ui.lp(WRAP, WRAP, dp(14)));
+        EditText modelInput = Ui.input(this, Prefs.DEFAULT_MODEL, false);
         modelInput.setSingleLine(true);
-        modelInput.setHint(Prefs.DEFAULT_MODEL);
         modelInput.setText(Prefs.model(this));
-        root.addView(modelInput);
-
-        Button save = new Button(this);
-        save.setText("Save");
+        ai.addView(modelInput, Ui.lp(MATCH, WRAP, dp(8)));
+        TextView save = Ui.primaryButton(this, "Save");
         save.setOnClickListener(v -> {
             Prefs.save(this, keyInput.getText().toString(), modelInput.getText().toString());
-            Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
+            keyInput.clearFocus();
+            modelInput.clearFocus();
+            save.setText("Saved");
+            save.animate().scaleX(1.03f).scaleY(1.03f).setDuration(120).withEndAction(() ->
+                    save.animate().scaleX(1f).scaleY(1f).setDuration(200).start()).start();
+            save.postDelayed(() -> save.setText("Save"), 1600);
         });
-        root.addView(save);
+        ai.addView(save, Ui.lp(MATCH, WRAP, dp(18)));
+        TextView keyNote = Ui.text(this, "Stored only on this device. Sent only to OpenAI.", 11.5f, 400, Ui.FAINT);
+        keyNote.setGravity(Gravity.CENTER);
+        ai.addView(keyNote, Ui.lp(MATCH, WRAP, dp(12)));
+        root.addView(ai, Ui.lp(MATCH, WRAP, dp(14)));
 
-        TextView help = new TextView(this);
-        help.setPadding(0, dp(16), 0, 0);
-        help.setText("How to use:\n"
-                + "• Once permission is on, a green bubble floats over every app. Drag it anywhere.\n"
-                + "• Tap the bubble to open the menu.\n"
-                + "• Select Question → drag a box around the question, OR long-press the question "
-                + "and it will auto-detect it.\n"
-                + "• Type Question → type it in yourself.\n"
-                + "• The answer is copied to your clipboard (and shown briefly).\n"
-                + "• To hide the bubble, turn the app off in Accessibility settings.");
-        root.addView(help);
+        // ---- guide card
+        LinearLayout guide = card();
+        guide.addView(Ui.label(this, "How it works"));
+        step(guide, "01", "Tap the bubble", "It floats over every app. Drag it and it snaps to the edges and corners.");
+        step(guide, "02", "Select question", "Drag a box around it, or press and hold on it to auto-detect.");
+        step(guide, "03", "Paste the answer", "The answer is copied to your clipboard automatically.");
+        root.addView(guide, Ui.lp(MATCH, WRAP, dp(14)));
+
+        TextView footer = Ui.text(this, "QUESTION BUBBLE  ·  V1.0", 10, 700, Ui.FAINT);
+        footer.setLetterSpacing(0.14f);
+        footer.setGravity(Gravity.CENTER);
+        root.addView(footer, Ui.lp(MATCH, WRAP, dp(24)));
 
         ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
         scroll.addView(root);
         setContentView(scroll);
+
+        Ui.enter(header, 0);
+        Ui.enter(access, 70);
+        Ui.enter(ai, 140);
+        Ui.enter(guide, 210);
+        Ui.enter(footer, 280);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         boolean on = isServiceEnabled();
-        status.setText(on
-                ? "✅ Permission granted. The bubble is running."
-                : "⚠️ Permission needed: turn on \"Question Bubble\" in Accessibility settings so "
-                  + "the bubble can show over other apps.");
-        status.setTextColor(on ? 0xFF4CAF50 : 0xFFFFB300);
-        grantButton.setEnabled(!on);
+        statusTitle.setText(on ? "Active" : "Not enabled");
+        statusSub.setText(on
+                ? "The bubble is running over your apps."
+                : "Turn on Question Bubble in Accessibility settings so the bubble can float over "
+                  + "other apps and read the area you select.");
+        GradientDrawable dot = new GradientDrawable();
+        dot.setShape(GradientDrawable.OVAL);
+        if (on) dot.setColor(Ui.WHITE);
+        else dot.setStroke(dp(2), Ui.FAINT);
+        statusDot.setBackground(dot);
+        if (on) {
+            accessButton.setText("Accessibility settings");
+            accessButton.setTextColor(Ui.WHITE);
+            accessButton.setBackground(Ui.rounded(0x00000000, dp(12), Ui.SEP, dp(1)));
+        } else {
+            accessButton.setText("Grant access");
+            accessButton.setTextColor(Ui.WIN);
+            accessButton.setBackground(Ui.rounded(Ui.WHITE, dp(12), 0, 0));
+        }
 
         if (!on && !askedThisLaunch) {
             askedThisLaunch = true;
-            new AlertDialog.Builder(this)
-                    .setTitle("Permission required")
-                    .setMessage("Question Bubble needs the Accessibility permission (like auto-clicker "
-                            + "apps) so it can show a floating bubble over other apps and read the "
-                            + "part of the screen you select.\n\nOn the next screen open "
-                            + "\"Installed apps\" / \"Downloaded apps\" → Question Bubble → turn it on.")
-                    .setPositiveButton("Open settings", (d, w) -> openAccessibilitySettings())
-                    .setNegativeButton("Later", null)
-                    .show();
+            statusTitle.postDelayed(() -> {
+                if (isFinishing()) return;
+                Ui.dialog(this, "Permission required",
+                        "Question Bubble needs Accessibility access, the same permission auto-clickers "
+                                + "use, so it can float over other apps and capture the part of the screen "
+                                + "you select.\n\nOn the next screen open Installed apps, choose Question "
+                                + "Bubble and turn it on.",
+                        "Open settings", this::openAccessibilitySettings, "Later");
+            }, 450);
         }
+    }
+
+    private LinearLayout card() {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setPadding(dp(18), dp(18), dp(18), dp(18));
+        c.setBackground(Ui.card(this));
+        return c;
+    }
+
+    private void step(LinearLayout parent, String num, String title, String body) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        TextView n = Ui.text(this, num, 12, 700, Ui.FAINT);
+        n.setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD);
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(dp(30), ViewGroup.LayoutParams.WRAP_CONTENT);
+        np.topMargin = dp(1);
+        row.addView(n, np);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.addView(Ui.text(this, title, 14, 600, Ui.TEXT));
+        TextView b = Ui.text(this, body, 12.5f, 400, Ui.DIM);
+        b.setLineSpacing(dp(3), 1f);
+        col.addView(b, Ui.lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, dp(4)));
+        row.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        parent.addView(row, Ui.lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, dp(16)));
     }
 
     private void openAccessibilitySettings() {
@@ -125,19 +198,15 @@ public class MainActivity extends Activity {
     }
 
     private void showRestrictedHelp() {
-        new AlertDialog.Builder(this)
-                .setTitle("Allow restricted settings")
-                .setMessage("Android 13+ blocks Accessibility for apps installed from an APK file.\n\n"
-                        + "1. Tap \"Open App info\".\n"
-                        + "2. Tap the ⋮ menu (top-right) → \"Allow restricted settings\".\n"
-                        + "3. Come back and tap \"Give permission\" again.\n\n"
-                        + "(If you don't see the option, first try turning the permission on once "
-                        + "so Android shows the 'Restricted setting' message, then come back.)")
-                .setPositiveButton("Open App info", (d, w) -> startActivity(
-                        new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                Uri.parse("package:" + getPackageName()))))
-                .setNegativeButton("Close", null)
-                .show();
+        Ui.dialog(this, "Allow restricted settings",
+                "Android 13 and newer block Accessibility for apps installed from a file.\n\n"
+                        + "1. Tap Open App info.\n"
+                        + "2. Tap the menu in the top-right corner, then Allow restricted settings.\n"
+                        + "3. Come back and tap Grant access again.\n\n"
+                        + "If the option is missing, try turning access on once first so Android "
+                        + "shows its Restricted setting message, then come back.",
+                "Open App info", () -> startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName()))), "Close");
     }
 
     private boolean isServiceEnabled() {
@@ -148,15 +217,7 @@ public class MainActivity extends Activity {
         return enabled.contains(cn.flattenToString()) || enabled.contains(cn.flattenToShortString());
     }
 
-    private TextView label(String text) {
-        TextView t = new TextView(this);
-        t.setText(text);
-        t.setPadding(0, dp(16), 0, 0);
-        t.setGravity(Gravity.START);
-        return t;
-    }
-
-    private int dp(int v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
+    private int dp(float v) {
+        return Ui.dp(this, v);
     }
 }
