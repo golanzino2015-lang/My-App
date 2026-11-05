@@ -472,6 +472,12 @@ final class SelectionView extends View {
         return super.onTouchEvent(e);
     }
 
+    /** Where the press was, in screen pixels (used when the press happened in another app). */
+    void setPress(int x, int y) {
+        startX = curX = x;
+        startY = curY = y;
+    }
+
     /** After a press-and-hold: pulse at the finger while the AI looks for the question. */
     void startSearching(String title, String sub, String whenFound) {
         foundSub = whenFound;

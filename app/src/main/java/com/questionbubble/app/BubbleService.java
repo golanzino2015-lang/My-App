@@ -53,7 +53,8 @@ public class BubbleService extends AccessibilityService {
     private static final String LOCATE_ONLY =
             "This is a screenshot of the user's phone. They pressed and held on it: the RED CIRCLE "
             + "marks where their finger was. Find the ONE question or block of content at or nearest "
-            + "to the red circle (include answer choices, if any).\n"
+            + "to the red circle (include answer choices, if any). Highlighted (selected) text, if any, "
+            + "is also where they pressed.\n"
             + "Reply with ONLY this JSON object and nothing else (no code fences):\n"
             + "{\"box\":[ymin,xmin,ymax,xmax]}\n"
             + "where box is its bounding box as integers from 0 to 1000 relative to the image's "
@@ -573,37 +574,98 @@ public class BubbleService extends AccessibilityService {
     // ---------------------------------------------------------------- auto mode
 
     private long lastAuto;
+    private int handledToolbar = -1;
 
-    /** Auto mode: a long-press (or text selection) in another app finds and answers the question there. */
+    /**
+     * Auto mode. Android doesn't let an app see touches in other apps, so we react to what a
+     * long-press causes: text getting selected (the Copy / Select all bar appears), or a view
+     * reporting a long-click. Then it's the same as press-and-hold on the scan screen: freeze,
+     * pulse at the spot, find the question, answer it.
+     */
     private void onLongPressElsewhere(AccessibilityEvent e) {
         if (wm == null || bubble == null || !Prefs.autoMode(this)) return;
-        int t = e.getEventType();
-        if (t != AccessibilityEvent.TYPE_VIEW_LONG_CLICKED && t != AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) return;
-        CharSequence pkg = e.getPackageName();
-        if (pkg == null || getPackageName().contentEquals(pkg)) return;
-        if (t == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED
-                && (e.getFromIndex() < 0 || e.getToIndex() <= e.getFromIndex())) return;
-        AccessibilityNodeInfo src = e.getSource();
-        if (src != null && src.isEditable()) return; // typing in a text box, not a question
         if (busy || selection != null || chatCaptureId != null || menu.isShowing()) return;
+        CharSequence pkg = e.getPackageName();
+        if (pkg != null && getPackageName().contentEquals(pkg)) return;
+
+        int t = e.getEventType();
+        android.graphics.Point spot = null;
+        if (t == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED
+                || (t == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED
+                && e.getFromIndex() >= 0 && e.getToIndex() > e.getFromIndex())) {
+            AccessibilityNodeInfo src = e.getSource();
+            if (src == null || src.isEditable()) return; // typing in a text box, not a question
+            Rect b = new Rect();
+            src.getBoundsInScreen(b);
+            if (b.isEmpty()) return;
+            spot = new android.graphics.Point(b.centerX(), b.centerY());
+        } else if (t == AccessibilityEvent.TYPE_WINDOWS_CHANGED || t == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            spot = selectionToolbarSpot();
+        }
+        if (spot == null) return;
+
         long now = SystemClock.uptimeMillis();
-        if (now - lastAuto < 4000) return;
+        if (now - lastAuto < 3000) return;
         lastAuto = now;
         if (Prefs.apiKey(this).isEmpty()) {
             island.show(Island.Kind.INFO, "Add your " + Prefs.provider(this).label + " key", "Auto mode needs it", 3000);
             return;
         }
-        Rect pressed = null;
-        if (src != null) {
-            pressed = new Rect();
-            src.getBoundsInScreen(pressed);
-        }
-        autoScan(pressed);
+        autoScan(spot.x, spot.y);
     }
 
-    private void autoScan(Rect pressed) {
-        busy = true;
-        bubble.haptic(android.view.HapticFeedbackConstants.CLOCK_TICK);
+    /**
+     * Long-pressing text selects it and shows a small Copy / Select all bar next to it. If that
+     * bar is up (and it's not a text box, which would also offer Cut / Paste), return a point
+     * just beside it, where the selected text is.
+     */
+    private android.graphics.Point selectionToolbarSpot() {
+        try {
+            android.content.res.Resources sys = android.content.res.Resources.getSystem();
+            String copy = sys.getString(android.R.string.copy);
+            String cut = sys.getString(android.R.string.cut);
+            String paste = sys.getString(android.R.string.paste);
+            Rect screen = wm.getCurrentWindowMetrics().getBounds();
+            for (AccessibilityWindowInfo w : getWindows()) {
+                int type = w.getType();
+                if (type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+                        || type == AccessibilityWindowInfo.TYPE_INPUT_METHOD) continue;
+                Rect b = new Rect();
+                w.getBoundsInScreen(b);
+                if (b.isEmpty() || b.height() > screen.height() * 0.2f) continue; // the bar is small
+                if (w.getId() == handledToolbar) continue;
+                AccessibilityNodeInfo root = w.getRoot();
+                if (root == null) continue;
+                CharSequence wp = root.getPackageName();
+                if (wp != null && getPackageName().contentEquals(wp)) continue;
+                if (!hasExact(root, copy)) continue;
+                if (hasExact(root, cut) || hasExact(root, paste)) continue; // editing, not reading
+                handledToolbar = w.getId();
+                int gap = Theme.dp(this, 44);
+                int y = b.bottom + gap < screen.bottom - gap ? b.bottom + gap : b.top - gap;
+                return new android.graphics.Point(b.centerX(), Math.max(screen.top, y));
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private static boolean hasExact(AccessibilityNodeInfo root, String label) {
+        List<AccessibilityNodeInfo> found = root.findAccessibilityNodeInfosByText(label);
+        if (found == null) return false;
+        for (AccessibilityNodeInfo n : found) {
+            CharSequence t = n.getText(), d = n.getContentDescription();
+            if ((t != null && label.equalsIgnoreCase(t.toString().trim()))
+                    || (d != null && label.equalsIgnoreCase(d.toString().trim()))) return true;
+        }
+        return false;
+    }
+
+    /** Freeze the screen and run press-and-hold detection at (x, y). */
+    private void autoScan(int x, int y) {
+        busy = true; // until the selection overlay takes over
+        bubble.haptic(android.view.HapticFeedbackConstants.LONG_PRESS);
+        island.hideNow();
         bubble.setHidden(true);
         main.postDelayed(() -> takeScreenshot(Display.DEFAULT_DISPLAY, getMainExecutor(),
                 new TakeScreenshotCallback() {
@@ -613,12 +675,16 @@ public class BubbleService extends AccessibilityService {
                         Bitmap hw = Bitmap.wrapHardwareBuffer(hb, result.getColorSpace());
                         Bitmap soft = hw == null ? null : hw.copy(Bitmap.Config.ARGB_8888, false);
                         hb.close();
-                        bubble.setHidden(false);
+                        busy = false;
                         if (soft == null) {
-                            busy = false;
+                            bubble.setHidden(false);
                             return;
                         }
-                        autoProcess(soft, pressed);
+                        showSelection(soft);
+                        int cx = Math.max(0, Math.min(soft.getWidth() - 1, x));
+                        int cy = Math.max(0, Math.min(soft.getHeight() - 1, y));
+                        if (selection != null) selection.setPress(cx, cy);
+                        autoDetect(cx, cy);
                     }
 
                     @Override
@@ -626,63 +692,7 @@ public class BubbleService extends AccessibilityService {
                         busy = false;
                         bubble.setHidden(false);
                     }
-                }), 220);
-    }
-
-    private void autoProcess(Bitmap shot, Rect pressed) {
-        int w = shot.getWidth(), h = shot.getHeight();
-        bubble.setBusy(true);
-        boolean gemini = !Prefs.apiKey(this, Provider.GEMINI).isEmpty();
-        island.show(Island.Kind.LOADING, "Finding the question",
-                gemini ? "Auto mode \u00B7 Gemini 3.5 Flash-Lite" : "Auto mode", 0);
-
-        Bitmap marked = shot.copy(Bitmap.Config.ARGB_8888, true);
-        if (pressed != null && !pressed.isEmpty() && pressed.width() * pressed.height() < w * h * 0.6f) {
-            Paint red = new Paint(Paint.ANTI_ALIAS_FLAG);
-            red.setStyle(Paint.Style.STROKE);
-            red.setStrokeWidth(Math.max(Theme.dp(this, 4), w * 0.006f));
-            red.setColor(Color.RED);
-            Rect m = new Rect(pressed);
-            m.inset(-Theme.dp(this, 6), -Theme.dp(this, 6));
-            new Canvas(marked).drawRect(m, red);
-        }
-        boolean detailed = Prefs.detailed(this);
-        worker.execute(() -> {
-            Rect box = geminiBox(marked, AUTO_LOCATE, w, h);
-            if (box != null) {
-                Bitmap crop = Bitmap.createBitmap(shot, box.left, box.top, box.width(), box.height())
-                        .copy(Bitmap.Config.ARGB_8888, false);
-                marked.recycle();
-                shot.recycle();
-                main.post(() -> {
-                    HighlightFlash.show(this, wm, box);
-                    busy = false;
-                    ask(crop, CROP_PROMPT);
-                });
-                return;
-            }
-            String reply = null, error = null;
-            try {
-                reply = Ai.ask(this, detailed, AUTO_LOCATE_AND_ANSWER, marked);
-            } catch (Exception e) {
-                error = String.valueOf(e.getMessage());
-            }
-            marked.recycle();
-            shot.recycle();
-            String rep = reply, err = error;
-            main.post(() -> {
-                busy = false;
-                bubble.setBusy(false);
-                if (err != null) {
-                    bubble.errorShake();
-                    island.show(Island.Kind.ERROR, "Couldn't get an answer", err, 5500);
-                    return;
-                }
-                Rect b2 = parseBox(rep, w, h);
-                if (b2 != null) HighlightFlash.show(this, wm, b2);
-                finishAnswer(parseAnswer(rep));
-            });
-        });
+                }), 160);
     }
 
     /** "{"box":[ymin,xmin,ymax,xmax],...}" (0-1000) -> padded screen rect, or null. */

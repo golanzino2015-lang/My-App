@@ -31,8 +31,11 @@ each uses your own API key.
   - Copy any reply; retry the last one.
 - **Main app**: swipe sideways between **Home** and **Chats** (or tap the tabs). Chats has your
   conversation list and a message box to start a new one.
-- **Auto mode** (switch on the home screen): long-press any question in any app, or select its
-  text, and it's found and answered automatically. No need to open the bubble.
+- **Auto mode** (switch on the home screen): long-press a question's text in any app. When the
+  text gets selected (the Copy / Select all bar appears), the screen freezes, rings pulse where you
+  pressed, the question is found and answered. Also reacts to anything an app reports as
+  long-pressed. Android doesn't let apps watch touches in other apps, so a long-press that neither
+  selects text nor counts as a long-click can't be seen; use the bubble's scan for those.
 - **Finding questions** (press-and-hold and Auto mode) uses **Gemini 3.5 Flash-Lite** when a
   Gemini key is saved; your chosen AI then answers just that question. Without a Gemini key, your
   chosen AI does both.
