@@ -21,6 +21,10 @@ public class MainActivity extends Activity {
 
     private LinearLayout content;
     private boolean firstRender = true;
+    private PagerFrame pager;
+    private SegmentedView tabs;
+    private LinearLayout chatsList;
+    private Composer composer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,23 +38,209 @@ public class MainActivity extends Activity {
         getWindow().setDecorFitsSystemWindows(false);
         Fonts.init(this);
 
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Theme.BG);
+        Theme.insets(root, true, true, true);
+
+        // Home | Chats tabs (swipe sideways to switch, like a feed app)
+        FrameLayout tabBar = new FrameLayout(this);
+        tabBar.setPadding(0, dp(8), 0, dp(4));
+        tabs = new SegmentedView(this, new String[]{"Home", "Chats"}, 0);
+        tabBar.addView(tabs, new FrameLayout.LayoutParams(dp(200), Theme.WRAP, Gravity.CENTER_HORIZONTAL));
+        root.addView(tabBar, Theme.lp(Theme.MATCH, Theme.WRAP));
+
+        pager = new PagerFrame(this);
+        pager.setFill(true);
+
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(Theme.BG);
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        scroll.setClipToPadding(false);
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(14), dp(20), dp(36));
+        content.setPadding(dp(20), dp(8), dp(20), dp(36));
         scroll.addView(content);
-        Theme.insets(scroll, true, true, false);
-        setContentView(scroll);
+        pager.addView(scroll);
+        pager.addView(chatsPage());
+        root.addView(pager, new LinearLayout.LayoutParams(Theme.MATCH, 0, 1));
+
+        tabs.setListener(i -> pager.goTo(i, true));
+        pager.setListener(i -> {
+            tabs.select(i);
+            if (i == 1) fillChats();
+            else hideKeyboard();
+        });
+        setContentView(root);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (content != null) render();
+        if (content != null) {
+            render();
+            fillChats();
+            composer.refresh();
+        }
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        if (pager != null && pager.page() == 1) pager.goTo(0, true);
+        else super.onBackPressed();
+    }
+
+    // ---------------------------------------------------------------- chats page
+
+    private View chatsPage() {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+
+        ScrollView sv = new ScrollView(this);
+        sv.setVerticalScrollBarEnabled(false);
+        sv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(20), dp(8), dp(20), dp(16));
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(Theme.text(this, "Chats", Theme.Type.HEADLINE), new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
+        head.addView(Rows.iconButton(this, R.drawable.ic_edit, () -> {
+            startActivity(new Intent(this, ChatActivity.class).putExtra(ChatActivity.EXTRA_NEW, true));
+            overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+        }));
+        col.addView(head, Theme.lp(Theme.MATCH, Theme.WRAP));
+        chatsList = new LinearLayout(this);
+        chatsList.setOrientation(LinearLayout.VERTICAL);
+        col.addView(chatsList, Theme.lp(Theme.MATCH, Theme.WRAP, dp(8)));
+        sv.addView(col);
+        page.addView(sv, new LinearLayout.LayoutParams(Theme.MATCH, 0, 1));
+
+        composer = new Composer(this, new Composer.Host() {
+            @Override
+            public void onSend(String text, java.util.List<String> images) {
+                if (Prefs.apiKey(MainActivity.this).isEmpty()) {
+                    Sheets.apiKey(MainActivity.this, Prefs.provider(MainActivity.this), () -> composer.refresh());
+                    return;
+                }
+                ChatActivity.draftText = text;
+                ChatActivity.draftImages.clear();
+                ChatActivity.draftImages.addAll(images);
+                composer.clear();
+                hideKeyboard();
+                startActivity(new Intent(MainActivity.this, ChatActivity.class)
+                        .putExtra(ChatActivity.EXTRA_NEW, true)
+                        .putExtra(ChatActivity.EXTRA_AUTOSEND, true));
+                overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+            }
+
+            @Override
+            public void onAttach() {
+                pickImage();
+            }
+
+            @Override
+            public void onModel() {
+                Sheets.modelPicker(MainActivity.this, () -> composer.refresh());
+            }
+        });
+        LinearLayout.LayoutParams cp = Theme.lp(Theme.MATCH, Theme.WRAP);
+        cp.leftMargin = dp(12);
+        cp.rightMargin = dp(12);
+        cp.bottomMargin = dp(10);
+        page.addView(composer, cp);
+        return page;
+    }
+
+    private void fillChats() {
+        if (chatsList == null) return;
+        chatsList.removeAllViews();
+        java.util.List<Chats.Chat> all = Chats.list(this);
+        if (all.isEmpty()) {
+            LinearLayout e = new LinearLayout(this);
+            e.setOrientation(LinearLayout.VERTICAL);
+            e.setGravity(Gravity.CENTER_HORIZONTAL);
+            e.setPadding(0, dp(48), 0, 0);
+            OrbView orb = new OrbView(this, 14);
+            orb.setDrawShadow(false);
+            orb.setGlow(0.3f);
+            e.addView(orb, new LinearLayout.LayoutParams(dp(104), dp(104)));
+            TextView t = Theme.text(this, "Start a conversation", Theme.Type.TITLE_S);
+            t.setGravity(Gravity.CENTER);
+            e.addView(t, Theme.lp(Theme.WRAP, Theme.WRAP, dp(16)));
+            TextView s = Theme.text(this, "Type below to chat with " + Prefs.provider(this).label + ". Chats save themselves.", Theme.Type.CAPTION);
+            s.setGravity(Gravity.CENTER);
+            e.addView(s, Theme.lp(Theme.WRAP, Theme.WRAP, dp(6)));
+            chatsList.addView(e, Theme.lp(Theme.MATCH, Theme.WRAP));
+            return;
+        }
+        String day = null;
+        LinearLayout group = null;
+        for (Chats.Chat c : all) {
+            String d = History.day(c.updated);
+            if (!d.equals(day)) {
+                day = d;
+                chatsList.addView(Rows.section(this, d), Theme.lp(Theme.MATCH, Theme.WRAP, dp(20)));
+                group = Rows.group(this);
+                chatsList.addView(group, Theme.lp(Theme.MATCH, Theme.WRAP, dp(8)));
+            }
+            LinearLayout row = Rows.row(this, R.drawable.ic_message, c.title.isEmpty() ? "Chat" : c.title,
+                    History.relative(c.updated) + " \u00B7 " + c.preview(), null, () -> {
+                        startActivity(new Intent(this, ChatActivity.class).putExtra(ChatActivity.EXTRA_CHAT, c.id));
+                        overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+                    });
+            TextView sub = (TextView) ((LinearLayout) row.getChildAt(1)).getChildAt(1);
+            sub.setSingleLine(true);
+            sub.setEllipsize(TextUtils.TruncateAt.END);
+            TextView title = (TextView) ((LinearLayout) row.getChildAt(1)).getChildAt(0);
+            title.setSingleLine(true);
+            title.setEllipsize(TextUtils.TruncateAt.END);
+            row.setOnLongClickListener(v -> {
+                Theme.tick(v);
+                Sheets.confirm(this, "Delete this chat?", c.title, "Delete", () -> {
+                    Chats.delete(this, c.id);
+                    fillChats();
+                    Snack.show(this, "Chat deleted", R.drawable.ic_check);
+                });
+                return true;
+            });
+            Rows.add(group, row);
+        }
+    }
+
+    private static final int PICK_IMAGE = 51;
+
+    @SuppressWarnings("deprecation")
+    private void pickImage() {
+        Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+        i.setType("image/*");
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        try {
+            startActivityForResult(i, PICK_IMAGE);
+        } catch (Exception e) {
+            Snack.show(this, "No photo picker found", R.drawable.ic_alert);
+        }
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != PICK_IMAGE || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        android.net.Uri uri = data.getData();
+        new Thread(() -> {
+            String name = ChatActivity.saveFromUri(getApplicationContext(), uri);
+            runOnUiThread(() -> {
+                if (name == null) Snack.show(this, "Couldn't open that image", R.drawable.ic_alert);
+                else composer.addImage(name);
+            });
+        }).start();
+    }
+
+    private void hideKeyboard() {
+        android.view.inputmethod.InputMethodManager imm = getSystemService(android.view.inputmethod.InputMethodManager.class);
+        if (imm != null && getCurrentFocus() != null) imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
     }
 
     private void render() {
@@ -66,7 +256,7 @@ public class MainActivity extends Activity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = Theme.text(this, "Question Bubble", Theme.Type.HEADLINE);
         bar.addView(title, new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
-        View chatBtn = Rows.iconButton(this, R.drawable.ic_message, () -> startActivity(new Intent(this, ChatActivity.class)));
+        View chatBtn = Rows.iconButton(this, R.drawable.ic_message, () -> pager.goTo(1, true));
         LinearLayout.LayoutParams cbp = new LinearLayout.LayoutParams(dp(42), dp(42));
         cbp.rightMargin = dp(8);
         bar.addView(chatBtn, cbp);

@@ -23,8 +23,11 @@ final class Chats {
         final String text;
         final List<String> images;  // image file names (user messages)
         final String provider, model;
-        final String raw;           // Claude: the full response JSON, replayed unchanged
+        final String raw;           // Claude: JSON array of the full responses, replayed unchanged
         final long time;
+        String thinking = "";       // reasoning summary to show (optional)
+        int searches;               // web searches the AI ran
+        int seconds;                // how long the answer took
 
         Msg(String role, String text, List<String> images, String provider, String model, String raw, long time) {
             this.role = role;
@@ -121,6 +124,9 @@ final class Chats {
                 for (String i : m.images) imgs.put(i);
                 mo.put("images", imgs);
                 if (m.raw != null) mo.put("raw", m.raw);
+                if (!m.thinking.isEmpty()) mo.put("thinking", m.thinking);
+                if (m.searches > 0) mo.put("searches", m.searches);
+                if (m.seconds > 0) mo.put("seconds", m.seconds);
                 arr.put(mo);
             }
             o.put("messages", arr);
@@ -151,9 +157,13 @@ final class Chats {
                     List<String> imgs = new ArrayList<>();
                     JSONArray ia = m.optJSONArray("images");
                     if (ia != null) for (int j = 0; j < ia.length(); j++) imgs.add(ia.getString(j));
-                    chat.messages.add(new Msg(m.optString("role"), m.optString("text"), imgs,
+                    Msg msg = new Msg(m.optString("role"), m.optString("text"), imgs,
                             m.optString("provider"), m.optString("model"),
-                            m.has("raw") ? m.optString("raw") : null, m.optLong("time")));
+                            m.has("raw") ? m.optString("raw") : null, m.optLong("time"));
+                    msg.thinking = m.optString("thinking", "");
+                    msg.searches = m.optInt("searches", 0);
+                    msg.seconds = m.optInt("seconds", 0);
+                    chat.messages.add(msg);
                 }
             }
             return chat;

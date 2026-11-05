@@ -20,6 +20,44 @@ import java.util.concurrent.Executors;
 /** The app's bottom sheets. */
 final class Sheets {
 
+    /** Claude-style model menu: every model grouped by AI, plus Think / Search switches. */
+    static void modelPicker(Activity a, Runnable onChanged) {
+        Sheet s = new Sheet(a);
+        s.title("Model", null);
+        android.widget.ScrollView sv = new android.widget.ScrollView(a);
+        sv.setVerticalScrollBarEnabled(false);
+        sv.addView(ModelList.build(a, true, new ModelList.Callback() {
+            @Override
+            public void onPicked() {
+                s.close();
+                if (onChanged != null) onChanged.run();
+            }
+
+            @Override
+            public void onNeedsKey(Provider p, String model) {
+                s.close();
+                new Handler(Looper.getMainLooper()).postDelayed(() -> apiKey(a, p, () -> {
+                    Prefs.setProvider(a, p);
+                    Prefs.setModel(a, p, model);
+                    if (onChanged != null) onChanged.run();
+                }), 320);
+            }
+        }));
+        int maxH = Math.round(a.getResources().getDisplayMetrics().heightPixels * 0.66f);
+        FrameLayout cap = new FrameLayout(a) {
+            @Override
+            protected void onMeasure(int w, int h) {
+                super.onMeasure(w, MeasureSpec.makeMeasureSpec(maxH, MeasureSpec.AT_MOST));
+            }
+        };
+        cap.addView(sv);
+        s.add(cap, 14);
+        s.setOnClosed(() -> {
+            if (onChanged != null) onChanged.run();
+        });
+        s.show();
+    }
+
     /** Pick ChatGPT / Claude / Gemini. Picking one without a key asks for it. */
     static void provider(Activity a, Runnable onChanged) {
         Sheet s = new Sheet(a);

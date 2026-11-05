@@ -43,8 +43,14 @@
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".chat"
-            android:theme="@style/OverlayTheme"
             android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
+            android:name=".PickImageActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=".pick"
+            android:theme="@style/OverlayTheme" />
 
         <service
             android:name=".BubbleService"

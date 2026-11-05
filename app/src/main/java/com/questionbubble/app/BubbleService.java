@@ -164,8 +164,33 @@ public class BubbleService extends AccessibilityService {
         }
         // the tap that closed the menu via "outside touch" shouldn't immediately reopen it
         if (System.currentTimeMillis() - menuClosedAt < 600) return;
+        openMenu(menuDraftImages.isEmpty() && menuDraftText.isEmpty() ? 0 : 1);
+    }
+
+    /** What's typed in the bubble's message box, kept while the user captures or picks an image. */
+    private String menuDraftText = "";
+    private final java.util.List<String> menuDraftImages = new java.util.ArrayList<>();
+    static final String MENU_CAPTURE = "__menu__";
+
+    private void saveMenuDraft() {
+        if (!menu.isShowing()) return;
+        menuDraftText = menu.draftText();
+        menuDraftImages.clear();
+        menuDraftImages.addAll(menu.draftImages());
+    }
+
+    /** The bubble's photo picker finished (name is null if cancelled). */
+    void bubbleImagePicked(String name) {
+        if (name != null && !menuDraftImages.contains(name)) menuDraftImages.add(name);
+        main.postDelayed(() -> {
+            if (bubble.isShowing() && !menu.isShowing()) openMenu(1);
+        }, 250);
+    }
+
+    private void openMenu(int page) {
         Rect orb = bubble.orbBounds();
         menu.show(orb, bubble.safeArea(), bubble.onLeftSide(), busy, History.latest(this),
+                page, menuDraftText, menuDraftImages,
                 new MenuPopover.Actions() {
                     @Override
                     public void scan() {
@@ -202,6 +227,47 @@ public class BubbleService extends AccessibilityService {
                     }
 
                     @Override
+                    public void send(String text, java.util.List<String> images) {
+                        // Send from the bubble: open a new chat that sends this right away.
+                        ChatActivity.draftText = text;
+                        ChatActivity.draftImages.clear();
+                        ChatActivity.draftImages.addAll(images);
+                        menuDraftText = "";
+                        menuDraftImages.clear();
+                        menu.dismissNow();
+                        bubble.setMenuOpen(false);
+                        if (!checkKey()) return;
+                        Intent i = new Intent(BubbleService.this, ChatActivity.class)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                .putExtra(ChatActivity.EXTRA_NEW, true)
+                                .putExtra(ChatActivity.EXTRA_AUTOSEND, true);
+                        startActivity(i);
+                    }
+
+                    @Override
+                    public void attachScreen() {
+                        saveMenuDraft();
+                        captureForChat(MENU_CAPTURE);
+                    }
+
+                    @Override
+                    public void attachPhoto() {
+                        saveMenuDraft();
+                        menu.dismissNow();
+                        bubble.setMenuOpen(false);
+                        startActivity(new Intent(BubbleService.this, PickImageActivity.class)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    }
+
+                    @Override
+                    public void needKey() {
+                        saveMenuDraft();
+                        closeMenu();
+                        island.show(Island.Kind.INFO, "Add that AI's key first", "Opening Question Bubble", 3000);
+                        openApp();
+                    }
+
+                    @Override
                     public void copyLast() {
                         History.Item last = History.latest(BubbleService.this);
                         closeMenu();
@@ -218,6 +284,7 @@ public class BubbleService extends AccessibilityService {
     }
 
     private void closeMenu() {
+        saveMenuDraft();
         if (menu.isShowing()) menu.dismiss();
         bubble.setMenuOpen(false);
     }
@@ -239,7 +306,7 @@ public class BubbleService extends AccessibilityService {
         startActivity(i);
     }
 
-    /** Save the picked area and reopen the chat with it attached. */
+    /** Save the picked area and hand it back: to the chat, or to the bubble's message box. */
     private void deliverToChat(Bitmap img) {
         String id = chatCaptureId;
         chatCaptureId = null;
@@ -252,7 +319,10 @@ public class BubbleService extends AccessibilityService {
                 img.recycle();
             }
             String n = name;
-            main.post(() -> openChat(id, false, n));
+            main.post(() -> {
+                if (MENU_CAPTURE.equals(id)) bubbleImagePicked(n);
+                else openChat(id, false, n);
+            });
         });
     }
 
@@ -295,7 +365,8 @@ public class BubbleService extends AccessibilityService {
         if (chatCaptureId == null) return;
         String id = chatCaptureId;
         chatCaptureId = null;
-        main.postDelayed(() -> openChat(id, false, null), 600);
+        if (MENU_CAPTURE.equals(id)) bubbleImagePicked(null);
+        else main.postDelayed(() -> openChat(id, false, null), 600);
     }
 
     private void showSelection(Bitmap shot) {
@@ -331,7 +402,8 @@ public class BubbleService extends AccessibilityService {
                 if (chatCaptureId != null) {
                     String id = chatCaptureId;
                     chatCaptureId = null;
-                    openChat(id, false, null);
+                    if (MENU_CAPTURE.equals(id)) bubbleImagePicked(null);
+                    else openChat(id, false, null);
                 }
             }
         });

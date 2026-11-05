@@ -19,14 +19,18 @@ each uses your own API key.
   - **History**: every answer, grouped by day. Tap to copy, long-press to delete.
   - **Settings**.
   - **Last answer**: copy it again with one tap.
-- **Swipe the menu sideways (or tap the Chat tab)** for the **Chat** page: start a new chat or
-  reopen a recent one.
-- **Chat**: a full chat with the AI you picked, in a sheet over whatever app you're in.
-  - Chats save themselves; the list button shows them all (press and hold one to delete it).
-  - **Scan button** next to the message box: the chat steps aside, you crop part of the screen,
-    and it comes back attached. The **photo button** attaches an image from your gallery.
-  - Replies render bold, bullets and code. Tap **Copy** under any reply.
-  - Switch AI from the chat's title. The conversation carries over.
+- **Chat from the bubble**: swipe the menu sideways (or tap **Chat**). Type right there, tap **+** to
+  capture part of the screen or pick a photo, and press send or Enter: the chat opens and the
+  message is sent.
+- **Chat**: full-screen, in the style of modern AI chat apps.
+  - ☰ opens your saved chats (they save themselves; press and hold to delete).
+  - The model name under the title (or in the message box) opens the **model switcher**: every
+    model from ChatGPT, Claude and Gemini, plus **Extended thinking** and **Web search** switches.
+  - **Think**: the AI reasons longer and shows a collapsible "Thought for 12s" section.
+  - **Search**: the AI can look things up on the web ("Searched the web · 2 searches").
+  - Copy any reply; retry the last one.
+- **Main app**: swipe sideways between **Home** and **Chats** (or tap the tabs). Chats has your
+  conversation list and a message box to start a new one.
 - **Hold the orb** to start a scan right away.
 - **Status pill** at the top of the screen shows progress, then "Copied to clipboard" with the
   answer. Tap it to dismiss.
@@ -80,8 +84,11 @@ app/src/main/java/com/questionbubble/app/
   MainActivity.java         home
   HistoryActivity.java      saved answers
   TypeQuestionActivity.java quick one-off question sheet
-  ChatActivity.java         saved chats with screen capture + gallery images
-  Chats.java / ChatApi.java chat storage; multi-turn requests for all three AIs
+  ChatActivity.java         full-screen chat: drawer, thinking blocks, search chips, retry
+  Composer.java             message box: attach, Think, Search, model switcher, send
+  ModelList.java            model switcher grouped by AI
+  PickImageActivity.java    photo picker for the bubble
+  Chats.java / ChatApi.java chat storage; multi-turn requests with thinking + web search
   PagerFrame.java           swipeable Tools / Chat pages in the bubble menu
   Md.java                   light Markdown rendering for replies
   Sheet.java / Sheets.java  bottom sheets (key, model, confirm, help)

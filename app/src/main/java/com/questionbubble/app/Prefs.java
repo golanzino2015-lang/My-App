@@ -81,6 +81,24 @@ final class Prefs {
         sp(c).edit().putString(K_STYLE, d ? "detailed" : "short").apply();
     }
 
+    /** Chat: let the AI think longer and show its reasoning. */
+    static boolean thinking(Context c) {
+        return sp(c).getBoolean("chat_thinking", true);
+    }
+
+    static void setThinking(Context c, boolean on) {
+        sp(c).edit().putBoolean("chat_thinking", on).apply();
+    }
+
+    /** Chat: allow the AI to search the web. */
+    static boolean webSearch(Context c) {
+        return sp(c).getBoolean("chat_search", false);
+    }
+
+    static void setWebSearch(Context c, boolean on) {
+        sp(c).edit().putBoolean("chat_search", on).apply();
+    }
+
     static boolean haptics(Context c) {
         return sp(c).getBoolean(K_HAPTICS, true);
     }

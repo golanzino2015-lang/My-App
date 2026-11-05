@@ -24,12 +24,18 @@ final class PagerFrame extends FrameLayout {
     private boolean dragging;
     private VelocityTracker vt;
     private ValueAnimator anim;
+    private boolean fill;
 
     PagerFrame(Context c) {
         super(c);
         slop = ViewConfiguration.get(c).getScaledTouchSlop();
         setClipChildren(true);
         setClipToPadding(true);
+    }
+
+    /** Pages take the pager's full height (for full-screen pages). */
+    void setFill(boolean f) {
+        fill = f;
     }
 
     void setListener(Listener l) {
@@ -43,6 +49,15 @@ final class PagerFrame extends FrameLayout {
     @Override
     protected void onMeasure(int widthSpec, int heightSpec) {
         int w = MeasureSpec.getSize(widthSpec);
+        if (fill) {
+            int h = MeasureSpec.getSize(heightSpec);
+            for (int i = 0; i < getChildCount(); i++) {
+                getChildAt(i).measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
+                        MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
+            }
+            setMeasuredDimension(w, h);
+            return;
+        }
         int h = 0;
         for (int i = 0; i < getChildCount(); i++) {
             View ch = getChildAt(i);
@@ -67,7 +82,7 @@ final class PagerFrame extends FrameLayout {
         int w = Math.max(1, getWidth());
         for (int i = 0; i < getChildCount(); i++) {
             float d = Math.min(1f, Math.abs(pos - i));
-            getChildAt(i).setAlpha(1f - 0.6f * d);
+            getChildAt(i).setAlpha(fill ? 1f : 1f - 0.6f * d);
         }
     }
 
