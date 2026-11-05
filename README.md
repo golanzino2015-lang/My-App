@@ -57,6 +57,24 @@ each uses your own API key.
 
 Or open the folder in **Android Studio** and press Run.
 
+### App bundle (.aab) for the Play Store
+
+Every build also produces **QuestionBubble-aab** (`app-release.aab`). The Play Store only accepts
+a bundle signed with your **upload key**. To have GitHub sign it, add these repository secrets
+(GitHub → Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|---|---|
+| `RELEASE_KEYSTORE_BASE64` | your keystore file, base64-encoded (`base64 -w0 upload.jks`) |
+| `RELEASE_KEYSTORE_PASSWORD` | keystore password |
+| `RELEASE_KEY_ALIAS` | key alias |
+| `RELEASE_KEY_PASSWORD` | key password |
+
+Create a keystore once with
+`keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000`
+and keep it safe: every future update must be signed with the same key. Without the secrets the
+bundle is built unsigned. The version code goes up automatically with each build.
+
 ## Setup on the phone
 
 The app walks you through this the first time you open it:
