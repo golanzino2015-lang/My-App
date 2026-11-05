@@ -567,13 +567,13 @@ public class ChatActivity extends Activity {
         Shimmer label = new Shimmer(this);
         Theme.style(label, Theme.Type.CALLOUT);
         row.addView(label);
-        boolean think = Prefs.thinking(this), search = Prefs.webSearch(this);
+        boolean think = Prefs.thinking(this);
         Runnable tick = new Runnable() {
             @Override
             public void run() {
                 if (pendingRow != row) return;
                 long s = (System.currentTimeMillis() - requestStart) / 1000;
-                String what = search && s < 6 ? "Searching the web" : think ? "Thinking" : "Writing";
+                String what = think ? "Thinking" : "Writing";
                 label.setText(what + (s >= 1 ? " · " + s + "s" : ""));
                 main.postDelayed(this, 1000);
             }

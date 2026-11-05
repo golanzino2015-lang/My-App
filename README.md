@@ -25,9 +25,9 @@ each uses your own API key.
 - **Chat**: full-screen, in the style of modern AI chat apps.
   - ☰ opens your saved chats (they save themselves; press and hold to delete).
   - The model name under the title (or in the message box) opens the **model switcher**: every
-    model from ChatGPT, Claude and Gemini, plus **Extended thinking** and **Web search** switches.
+    model from ChatGPT, Claude and Gemini, plus an **Extended thinking** switch.
   - **Think**: the AI reasons longer and shows a collapsible "Thought for 12s" section.
-  - **Search**: the AI can look things up on the web ("Searched the web · 2 searches").
+  - Web search is always on: the AI looks things up when it needs to ("Searched the web · 2 searches").
   - Copy any reply; retry the last one.
 - **Main app**: swipe sideways between **Home** and **Chats** (or tap the tabs). Chats has your
   conversation list and a message box to start a new one.

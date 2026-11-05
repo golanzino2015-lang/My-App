@@ -59,9 +59,6 @@ final class ModelList {
             ToggleView think = new ToggleView(c, Prefs.thinking(c));
             think.setListener(on -> Prefs.setThinking(c, on));
             Rows.add(g, Rows.row(c, R.drawable.ic_bulb, "Extended thinking", "Think longer and show the reasoning", think, null));
-            ToggleView search = new ToggleView(c, Prefs.webSearch(c));
-            search.setListener(on -> Prefs.setWebSearch(c, on));
-            Rows.add(g, Rows.row(c, R.drawable.ic_globe, "Web search", "Let the AI look things up", search, null));
             root.addView(g, Theme.lp(Theme.MATCH, Theme.WRAP, Theme.dp(c, 8)));
         }
         return root;

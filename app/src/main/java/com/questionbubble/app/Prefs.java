@@ -90,9 +90,9 @@ final class Prefs {
         sp(c).edit().putBoolean("chat_thinking", on).apply();
     }
 
-    /** Chat: allow the AI to search the web. */
+    /** Chat: the AI may search the web whenever it needs to (always on). */
     static boolean webSearch(Context c) {
-        return sp(c).getBoolean("chat_search", false);
+        return true;
     }
 
     static void setWebSearch(Context c, boolean on) {

@@ -42,8 +42,8 @@ final class Composer extends LinearLayout {
     private final HorizontalScrollView attachScroll;
     private final LinearLayout attachRow;
     private final EditText input;
-    private final FrameLayout thinkBtn, searchBtn;
-    private final ImageView thinkIcon, searchIcon;
+    private final FrameLayout thinkBtn;
+    private final ImageView thinkIcon;
     private final TextView modelChip;
     private final FrameLayout send;
     private final ImageView sendIcon;
@@ -129,19 +129,9 @@ final class Composer extends LinearLayout {
             refresh();
             flashHint(on ? "Thinking on" : "Thinking off");
         });
-        searchIcon = Theme.icon(c, R.drawable.ic_globe, Theme.TEXT, 17);
-        searchBtn = toggle(searchIcon, "Web search", () -> {
-            boolean on = !Prefs.webSearch(getContext());
-            Prefs.setWebSearch(getContext(), on);
-            refresh();
-            flashHint(on ? "Web search on" : "Web search off");
-        });
         LayoutParams tp = new LayoutParams(dp(34), dp(34));
         tp.leftMargin = dp(6);
         row.addView(thinkBtn, tp);
-        LayoutParams sp2 = new LayoutParams(dp(34), dp(34));
-        sp2.leftMargin = dp(6);
-        row.addView(searchBtn, sp2);
 
         // model name takes whatever room is left and shrinks, so send always fits
         modelChip = Theme.oneLine(Theme.text(c, "", Theme.Type.LABEL));
@@ -225,7 +215,6 @@ final class Composer extends LinearLayout {
         Context c = getContext();
         input.setHint("Message " + Prefs.provider(c).label);
         styleToggle(thinkBtn, thinkIcon, Prefs.thinking(c));
-        styleToggle(searchBtn, searchIcon, Prefs.webSearch(c));
         modelChip.setText(Provider.modelLabel(Prefs.model(c)));
         android.graphics.drawable.Drawable d = c.getDrawable(R.drawable.ic_chevron_down);
         if (d != null) {
