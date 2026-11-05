@@ -31,6 +31,11 @@ each uses your own API key.
   - Copy any reply; retry the last one.
 - **Main app**: swipe sideways between **Home** and **Chats** (or tap the tabs). Chats has your
   conversation list and a message box to start a new one.
+- **Auto mode** (switch on the home screen): long-press any question in any app, or select its
+  text, and it's found and answered automatically. No need to open the bubble.
+- **Finding questions** (press-and-hold and Auto mode) uses **Gemini 3.5 Flash-Lite** when a
+  Gemini key is saved; your chosen AI then answers just that question. Without a Gemini key, your
+  chosen AI does both.
 - **Hold the orb** to start a scan right away.
 - **Status pill** at the top of the screen shows progress, then "Copied to clipboard" with the
   answer. Tap it to dismiss.

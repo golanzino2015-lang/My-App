@@ -100,6 +100,15 @@ final class Prefs {
         sp(c).edit().putBoolean("chat_search", on).apply();
     }
 
+    /** Long-press anything on screen to find and answer the question there. */
+    static boolean autoMode(Context c) {
+        return sp(c).getBoolean("auto_mode", false);
+    }
+
+    static void setAutoMode(Context c, boolean on) {
+        sp(c).edit().putBoolean("auto_mode", on).apply();
+    }
+
     static boolean haptics(Context c) {
         return sp(c).getBoolean(K_HAPTICS, true);
     }

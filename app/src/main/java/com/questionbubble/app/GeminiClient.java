@@ -86,6 +86,52 @@ final class GeminiClient {
         }
     }
 
+    /** Fast model used only to find where a question is on the screen. */
+    static final String LOCATE_MODEL = "gemini-3.5-flash-lite";
+
+    /** Ask Gemini for a JSON reply (used to find a question's box). Returns the raw JSON text. */
+    static String locate(String key, Bitmap image, String prompt) throws Exception {
+        JSONArray parts = new JSONArray()
+                .put(new JSONObject().put("text", prompt))
+                .put(new JSONObject().put("inline_data", new JSONObject()
+                        .put("mime_type", "image/jpeg").put("data", OpenAiClient.toBase64Jpeg(image))));
+        JSONObject body = new JSONObject()
+                .put("contents", new JSONArray().put(new JSONObject().put("role", "user").put("parts", parts)))
+                .put("generationConfig", new JSONObject()
+                        .put("responseMimeType", "application/json")
+                        .put("thinkingConfig", new JSONObject().put("thinkingLevel", "low")));
+        HttpURLConnection conn = (HttpURLConnection) new URL(BASE + "models/" + LOCATE_MODEL + ":generateContent").openConnection();
+        try {
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(15_000);
+            conn.setReadTimeout(45_000);
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("x-goog-api-key", key);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+            }
+            int code = conn.getResponseCode();
+            InputStream is = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
+            String resp = is == null ? "" : readAll(is);
+            if (code >= 400) throw new Exception(friendlyError(code, resp));
+            JSONArray cands = new JSONObject(resp).optJSONArray("candidates");
+            if (cands == null || cands.length() == 0) throw new Exception("No result");
+            JSONObject content = cands.getJSONObject(0).optJSONObject("content");
+            JSONArray ps = content == null ? null : content.optJSONArray("parts");
+            StringBuilder out = new StringBuilder();
+            if (ps != null) {
+                for (int i = 0; i < ps.length(); i++) {
+                    JSONObject p = ps.getJSONObject(i);
+                    if (!p.optBoolean("thought", false)) out.append(p.optString("text", ""));
+                }
+            }
+            return out.toString();
+        } finally {
+            conn.disconnect();
+        }
+    }
+
     static void verifyKey(String key) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(BASE + "models?pageSize=1").openConnection();
         try {

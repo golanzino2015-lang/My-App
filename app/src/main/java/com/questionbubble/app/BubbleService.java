@@ -15,6 +15,7 @@ import android.graphics.Rect;
 import android.hardware.HardwareBuffer;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.View;
@@ -131,7 +132,7 @@ public class BubbleService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Not used: the service exists for overlays and screenshots.
+        if (event != null) onLongPressElsewhere(event);
     }
 
     @Override
@@ -462,10 +463,42 @@ public class BubbleService extends AccessibilityService {
 
     private boolean locateCancelled;
 
+    private static final String AUTO_LOCATE =
+            "This is a screenshot of the user's phone. They long-pressed on it: the RED BOX (if there "
+            + "is one) marks the item they pressed, and any highlighted (selected) text is also where "
+            + "they pressed. Find the ONE question nearest that spot (including its answer choices, if "
+            + "any) and ignore every other question.\n"
+            + "Reply with ONLY this JSON object: {\"box\":[ymin,xmin,ymax,xmax]} where box is its "
+            + "bounding box as integers from 0 to 1000 relative to the image's height (y) and width (x).";
+    private static final String AUTO_LOCATE_AND_ANSWER =
+            "This is a screenshot of the user's phone. They long-pressed on it: the RED BOX (if there "
+            + "is one) marks the item they pressed, and any highlighted (selected) text is also where "
+            + "they pressed. Find the ONE question nearest that spot (including its answer choices, if "
+            + "any), ignore every other question, and answer it.\n"
+            + "Reply with ONLY this JSON object and nothing else (no code fences):\n"
+            + "{\"box\":[ymin,xmin,ymax,xmax],\"answer\":\"...\"}\n"
+            + "- box: that question's bounding box as integers from 0 to 1000 relative to the image's "
+            + "height (y) and width (x).\n"
+            + "- answer: your answer to it, following your usual answer rules.";
+
     /**
-     * Press-and-hold: the AI looks at the whole screen (with the finger's spot marked), finds the
-     * question nearest to it, and answers it in the same request. The frozen screen shows a
-     * pulsing ring meanwhile, then the found question is highlighted.
+     * Find where the question is with Gemini 3.5 Flash-Lite (fast and cheap). Returns null when
+     * there's no Gemini key or it didn't work, so the caller can fall back. Background thread.
+     */
+    private Rect geminiBox(Bitmap marked, String prompt, int w, int h) {
+        String key = Prefs.apiKey(this, Provider.GEMINI);
+        if (key.isEmpty()) return null;
+        try {
+            return parseBox(GeminiClient.locate(key, marked, prompt), w, h);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Press-and-hold on the scan screen. Gemini 3.5 Flash-Lite finds the question nearest the
+     * finger, the box animates onto it, then your chosen AI answers just that question. Without a
+     * Gemini key, your chosen AI finds and answers it in one request.
      */
     private void autoDetect(int x, int y) {
         Bitmap shot = screenshot;
@@ -485,8 +518,9 @@ public class BubbleService extends AccessibilityService {
         red.setStyle(Paint.Style.FILL);
         cv.drawCircle(x, y, red.getStrokeWidth(), red);
 
-        sv.startSearching("Finding the question", forChat ? "Looking where you pressed"
-                : "Asking " + Prefs.provider(this).label, forChat ? "Adding it to your chat" : "Answer copied");
+        boolean gemini = !Prefs.apiKey(this, Provider.GEMINI).isEmpty();
+        sv.startSearching("Finding the question", gemini ? "Using Gemini 3.5 Flash-Lite"
+                : "Asking " + Prefs.provider(this).label, forChat ? "Adding it to your chat" : "Getting your answer");
         locateCancelled = false;
         if (!forChat) {
             busy = true;
@@ -494,15 +528,16 @@ public class BubbleService extends AccessibilityService {
         }
         boolean detailed = Prefs.detailed(this);
         worker.execute(() -> {
-            String reply = null;
-            String error = null;
-            try {
-                reply = Ai.ask(this, detailed, forChat ? LOCATE_ONLY : LOCATE_AND_ANSWER, marked);
-            } catch (Exception e) {
-                error = String.valueOf(e.getMessage());
-            } finally {
-                marked.recycle();
+            Rect fast = geminiBox(marked, LOCATE_ONLY, w, h);
+            String reply = null, error = null;
+            if (fast == null) {
+                try {
+                    reply = Ai.ask(this, detailed, forChat ? LOCATE_ONLY : LOCATE_AND_ANSWER, marked);
+                } catch (Exception e) {
+                    error = String.valueOf(e.getMessage());
+                }
             }
+            marked.recycle();
             String rep = reply, err = error;
             main.post(() -> {
                 if (!forChat) {
@@ -510,27 +545,142 @@ public class BubbleService extends AccessibilityService {
                     bubble.setBusy(false);
                 }
                 if (locateCancelled || selection != sv || screenshot != shot) return;
-                if (err != null && !forChat) {
+                if (fast == null && err != null && !forChat) {
                     removeSelection(true);
                     bubble.errorShake();
                     island.show(Island.Kind.ERROR, "Couldn't get an answer", err, 5500);
                     return;
                 }
-                Rect box = rep == null ? null : parseBox(rep, w, h);
+                Rect box = fast != null ? fast : rep == null ? null : parseBox(rep, w, h);
                 Rect area = box != null ? box
                         : new Rect(0, Math.max(0, y - Math.round(h * 0.15f)), w, Math.min(h, y + Math.round(h * 0.15f)));
-                String answer = forChat ? null : parseAnswer(rep);
                 sv.showDetected(area, () -> {
-                    if (forChat) {
+                    if (forChat || fast != null) {
                         Bitmap crop = Bitmap.createBitmap(shot, area.left, area.top, area.width(), area.height())
                                 .copy(Bitmap.Config.ARGB_8888, false);
                         removeSelection(true);
-                        deliverToChat(crop);
+                        if (forChat) deliverToChat(crop);
+                        else ask(crop, CROP_PROMPT);
                     } else {
                         removeSelection(true);
-                        finishAnswer(answer);
+                        finishAnswer(parseAnswer(rep));
                     }
                 });
+            });
+        });
+    }
+
+    // ---------------------------------------------------------------- auto mode
+
+    private long lastAuto;
+
+    /** Auto mode: a long-press (or text selection) in another app finds and answers the question there. */
+    private void onLongPressElsewhere(AccessibilityEvent e) {
+        if (wm == null || bubble == null || !Prefs.autoMode(this)) return;
+        int t = e.getEventType();
+        if (t != AccessibilityEvent.TYPE_VIEW_LONG_CLICKED && t != AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) return;
+        CharSequence pkg = e.getPackageName();
+        if (pkg == null || getPackageName().contentEquals(pkg)) return;
+        if (t == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED
+                && (e.getFromIndex() < 0 || e.getToIndex() <= e.getFromIndex())) return;
+        AccessibilityNodeInfo src = e.getSource();
+        if (src != null && src.isEditable()) return; // typing in a text box, not a question
+        if (busy || selection != null || chatCaptureId != null || menu.isShowing()) return;
+        long now = SystemClock.uptimeMillis();
+        if (now - lastAuto < 4000) return;
+        lastAuto = now;
+        if (Prefs.apiKey(this).isEmpty()) {
+            island.show(Island.Kind.INFO, "Add your " + Prefs.provider(this).label + " key", "Auto mode needs it", 3000);
+            return;
+        }
+        Rect pressed = null;
+        if (src != null) {
+            pressed = new Rect();
+            src.getBoundsInScreen(pressed);
+        }
+        autoScan(pressed);
+    }
+
+    private void autoScan(Rect pressed) {
+        busy = true;
+        bubble.haptic(android.view.HapticFeedbackConstants.CLOCK_TICK);
+        bubble.setHidden(true);
+        main.postDelayed(() -> takeScreenshot(Display.DEFAULT_DISPLAY, getMainExecutor(),
+                new TakeScreenshotCallback() {
+                    @Override
+                    public void onSuccess(ScreenshotResult result) {
+                        HardwareBuffer hb = result.getHardwareBuffer();
+                        Bitmap hw = Bitmap.wrapHardwareBuffer(hb, result.getColorSpace());
+                        Bitmap soft = hw == null ? null : hw.copy(Bitmap.Config.ARGB_8888, false);
+                        hb.close();
+                        bubble.setHidden(false);
+                        if (soft == null) {
+                            busy = false;
+                            return;
+                        }
+                        autoProcess(soft, pressed);
+                    }
+
+                    @Override
+                    public void onFailure(int errorCode) {
+                        busy = false;
+                        bubble.setHidden(false);
+                    }
+                }), 220);
+    }
+
+    private void autoProcess(Bitmap shot, Rect pressed) {
+        int w = shot.getWidth(), h = shot.getHeight();
+        bubble.setBusy(true);
+        boolean gemini = !Prefs.apiKey(this, Provider.GEMINI).isEmpty();
+        island.show(Island.Kind.LOADING, "Finding the question",
+                gemini ? "Auto mode \u00B7 Gemini 3.5 Flash-Lite" : "Auto mode", 0);
+
+        Bitmap marked = shot.copy(Bitmap.Config.ARGB_8888, true);
+        if (pressed != null && !pressed.isEmpty() && pressed.width() * pressed.height() < w * h * 0.6f) {
+            Paint red = new Paint(Paint.ANTI_ALIAS_FLAG);
+            red.setStyle(Paint.Style.STROKE);
+            red.setStrokeWidth(Math.max(Theme.dp(this, 4), w * 0.006f));
+            red.setColor(Color.RED);
+            Rect m = new Rect(pressed);
+            m.inset(-Theme.dp(this, 6), -Theme.dp(this, 6));
+            new Canvas(marked).drawRect(m, red);
+        }
+        boolean detailed = Prefs.detailed(this);
+        worker.execute(() -> {
+            Rect box = geminiBox(marked, AUTO_LOCATE, w, h);
+            if (box != null) {
+                Bitmap crop = Bitmap.createBitmap(shot, box.left, box.top, box.width(), box.height())
+                        .copy(Bitmap.Config.ARGB_8888, false);
+                marked.recycle();
+                shot.recycle();
+                main.post(() -> {
+                    HighlightFlash.show(this, wm, box);
+                    busy = false;
+                    ask(crop, CROP_PROMPT);
+                });
+                return;
+            }
+            String reply = null, error = null;
+            try {
+                reply = Ai.ask(this, detailed, AUTO_LOCATE_AND_ANSWER, marked);
+            } catch (Exception e) {
+                error = String.valueOf(e.getMessage());
+            }
+            marked.recycle();
+            shot.recycle();
+            String rep = reply, err = error;
+            main.post(() -> {
+                busy = false;
+                bubble.setBusy(false);
+                if (err != null) {
+                    bubble.errorShake();
+                    island.show(Island.Kind.ERROR, "Couldn't get an answer", err, 5500);
+                    return;
+                }
+                Rect b2 = parseBox(rep, w, h);
+                if (b2 != null) HighlightFlash.show(this, wm, b2);
+                finishAnswer(parseAnswer(rep));
             });
         });
     }

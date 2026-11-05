@@ -25,6 +25,7 @@ final class SegmentedView extends View {
     private int selected;
     private float pos; // animated index
     private Listener listener;
+    private int heightDp = 40;
     private ValueAnimator anim;
 
     SegmentedView(Context c, String[] options, int selected) {
@@ -48,6 +49,11 @@ final class SegmentedView extends View {
         setClickable(true);
     }
 
+    void setHeightDp(int h) {
+        heightDp = h;
+        requestLayout();
+    }
+
     void setListener(Listener l) {
         listener = l;
     }
@@ -69,7 +75,7 @@ final class SegmentedView extends View {
 
     @Override
     protected void onMeasure(int w, int h) {
-        setMeasuredDimension(resolveSize(Theme.dp(getContext(), 240), w), Theme.dp(getContext(), 40));
+        setMeasuredDimension(resolveSize(Theme.dp(getContext(), 240), w), Theme.dp(getContext(), heightDp));
     }
 
     @SuppressLint("ClickableViewAccessibility")

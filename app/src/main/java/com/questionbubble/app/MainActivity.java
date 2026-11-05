@@ -298,6 +298,35 @@ public class MainActivity extends Activity {
             heroRow.addView(toggle);
         }
         hero.addView(heroRow);
+        if (access) {
+            View div = new View(this);
+            div.setBackgroundColor(Theme.HAIRLINE);
+            hero.addView(div, Theme.lp(Theme.MATCH, Math.max(1, dp(0.8f)), dp(16)));
+            LinearLayout autoRow = new LinearLayout(this);
+            autoRow.setOrientation(LinearLayout.HORIZONTAL);
+            autoRow.setGravity(Gravity.CENTER_VERTICAL);
+            FrameLayout tile = Theme.iconTile(this, R.drawable.ic_hand, 40);
+            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(dp(40), dp(40));
+            tp.rightMargin = dp(14);
+            autoRow.addView(tile, tp);
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            col.addView(Theme.text(this, "Auto mode", Theme.Type.BODY_M));
+            boolean hasGemini = !Prefs.apiKey(this, Provider.GEMINI).isEmpty();
+            String autoSub = "Long-press any question on screen to answer it"
+                    + (hasGemini ? " \u00B7 finds it with Gemini 3.5 Flash-Lite" : " \u00B7 add a Gemini key to find it faster");
+            col.addView(Theme.text(this, autoSub, Theme.Type.CAPTION), Theme.lp(Theme.WRAP, Theme.WRAP, dp(4)));
+            autoRow.addView(col, new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
+            ToggleView autoToggle = new ToggleView(this, Prefs.autoMode(this));
+            autoToggle.setListener(on -> {
+                Prefs.setAutoMode(this, on);
+                Snack.show(this, on ? "Auto mode on: long-press a question" : "Auto mode off", R.drawable.ic_check);
+            });
+            LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(Theme.WRAP, Theme.WRAP);
+            ap.leftMargin = dp(12);
+            autoRow.addView(autoToggle, ap);
+            hero.addView(autoRow, Theme.lp(Theme.MATCH, Theme.WRAP, dp(16)));
+        }
         if (!access) {
             PillButton grant = new PillButton(this, "Grant access", PillButton.Kind.PRIMARY);
             grant.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
