@@ -454,7 +454,7 @@ final class MenuPopover {
         LinearLayout.LayoutParams dp6 = new LinearLayout.LayoutParams(dp(6), dp(6));
         dp6.rightMargin = dp(6);
         chip.addView(dot, dp6);
-        TextView t = Theme.text(c, busy ? "Working" : Prefs.autoMode(c) ? "Auto" : "Ready", Theme.Type.LABEL);
+        TextView t = Theme.text(c, busy ? "Working" : "Ready", Theme.Type.LABEL);
         t.setTextSize(12f);
         chip.addView(t);
         if (busy) {

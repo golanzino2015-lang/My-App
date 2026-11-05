@@ -133,7 +133,7 @@ public class BubbleService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (event != null) onLongPressElsewhere(event);
+        // Not used: the service exists for overlays and screenshots.
     }
 
     @Override
@@ -464,23 +464,6 @@ public class BubbleService extends AccessibilityService {
 
     private boolean locateCancelled;
 
-    private static final String AUTO_LOCATE =
-            "This is a screenshot of the user's phone. They long-pressed on it: the RED BOX (if there "
-            + "is one) marks the item they pressed, and any highlighted (selected) text is also where "
-            + "they pressed. Find the ONE question nearest that spot (including its answer choices, if "
-            + "any) and ignore every other question.\n"
-            + "Reply with ONLY this JSON object: {\"box\":[ymin,xmin,ymax,xmax]} where box is its "
-            + "bounding box as integers from 0 to 1000 relative to the image's height (y) and width (x).";
-    private static final String AUTO_LOCATE_AND_ANSWER =
-            "This is a screenshot of the user's phone. They long-pressed on it: the RED BOX (if there "
-            + "is one) marks the item they pressed, and any highlighted (selected) text is also where "
-            + "they pressed. Find the ONE question nearest that spot (including its answer choices, if "
-            + "any), ignore every other question, and answer it.\n"
-            + "Reply with ONLY this JSON object and nothing else (no code fences):\n"
-            + "{\"box\":[ymin,xmin,ymax,xmax],\"answer\":\"...\"}\n"
-            + "- box: that question's bounding box as integers from 0 to 1000 relative to the image's "
-            + "height (y) and width (x).\n"
-            + "- answer: your answer to it, following your usual answer rules.";
 
     /**
      * Find where the question is with Gemini 3.5 Flash-Lite (fast and cheap). Returns null when
@@ -569,130 +552,6 @@ public class BubbleService extends AccessibilityService {
                 });
             });
         });
-    }
-
-    // ---------------------------------------------------------------- auto mode
-
-    private long lastAuto;
-    private int handledToolbar = -1;
-
-    /**
-     * Auto mode. Android doesn't let an app see touches in other apps, so we react to what a
-     * long-press causes: text getting selected (the Copy / Select all bar appears), or a view
-     * reporting a long-click. Then it's the same as press-and-hold on the scan screen: freeze,
-     * pulse at the spot, find the question, answer it.
-     */
-    private void onLongPressElsewhere(AccessibilityEvent e) {
-        if (wm == null || bubble == null || !Prefs.autoMode(this)) return;
-        if (busy || selection != null || chatCaptureId != null || menu.isShowing()) return;
-        CharSequence pkg = e.getPackageName();
-        if (pkg != null && getPackageName().contentEquals(pkg)) return;
-
-        int t = e.getEventType();
-        android.graphics.Point spot = null;
-        if (t == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED
-                || (t == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED
-                && e.getFromIndex() >= 0 && e.getToIndex() > e.getFromIndex())) {
-            AccessibilityNodeInfo src = e.getSource();
-            if (src == null || src.isEditable()) return; // typing in a text box, not a question
-            Rect b = new Rect();
-            src.getBoundsInScreen(b);
-            if (b.isEmpty()) return;
-            spot = new android.graphics.Point(b.centerX(), b.centerY());
-        } else if (t == AccessibilityEvent.TYPE_WINDOWS_CHANGED || t == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            spot = selectionToolbarSpot();
-        }
-        if (spot == null) return;
-
-        long now = SystemClock.uptimeMillis();
-        if (now - lastAuto < 3000) return;
-        lastAuto = now;
-        if (Prefs.apiKey(this).isEmpty()) {
-            island.show(Island.Kind.INFO, "Add your " + Prefs.provider(this).label + " key", "Auto mode needs it", 3000);
-            return;
-        }
-        autoScan(spot.x, spot.y);
-    }
-
-    /**
-     * Long-pressing text selects it and shows a small Copy / Select all bar next to it. If that
-     * bar is up (and it's not a text box, which would also offer Cut / Paste), return a point
-     * just beside it, where the selected text is.
-     */
-    private android.graphics.Point selectionToolbarSpot() {
-        try {
-            android.content.res.Resources sys = android.content.res.Resources.getSystem();
-            String copy = sys.getString(android.R.string.copy);
-            String cut = sys.getString(android.R.string.cut);
-            String paste = sys.getString(android.R.string.paste);
-            Rect screen = wm.getCurrentWindowMetrics().getBounds();
-            for (AccessibilityWindowInfo w : getWindows()) {
-                int type = w.getType();
-                if (type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
-                        || type == AccessibilityWindowInfo.TYPE_INPUT_METHOD) continue;
-                Rect b = new Rect();
-                w.getBoundsInScreen(b);
-                if (b.isEmpty() || b.height() > screen.height() * 0.2f) continue; // the bar is small
-                if (w.getId() == handledToolbar) continue;
-                AccessibilityNodeInfo root = w.getRoot();
-                if (root == null) continue;
-                CharSequence wp = root.getPackageName();
-                if (wp != null && getPackageName().contentEquals(wp)) continue;
-                if (!hasExact(root, copy)) continue;
-                if (hasExact(root, cut) || hasExact(root, paste)) continue; // editing, not reading
-                handledToolbar = w.getId();
-                int gap = Theme.dp(this, 44);
-                int y = b.bottom + gap < screen.bottom - gap ? b.bottom + gap : b.top - gap;
-                return new android.graphics.Point(b.centerX(), Math.max(screen.top, y));
-            }
-        } catch (Exception ignored) {
-        }
-        return null;
-    }
-
-    private static boolean hasExact(AccessibilityNodeInfo root, String label) {
-        List<AccessibilityNodeInfo> found = root.findAccessibilityNodeInfosByText(label);
-        if (found == null) return false;
-        for (AccessibilityNodeInfo n : found) {
-            CharSequence t = n.getText(), d = n.getContentDescription();
-            if ((t != null && label.equalsIgnoreCase(t.toString().trim()))
-                    || (d != null && label.equalsIgnoreCase(d.toString().trim()))) return true;
-        }
-        return false;
-    }
-
-    /** Freeze the screen and run press-and-hold detection at (x, y). */
-    private void autoScan(int x, int y) {
-        busy = true; // until the selection overlay takes over
-        bubble.haptic(android.view.HapticFeedbackConstants.LONG_PRESS);
-        island.hideNow();
-        bubble.setHidden(true);
-        main.postDelayed(() -> takeScreenshot(Display.DEFAULT_DISPLAY, getMainExecutor(),
-                new TakeScreenshotCallback() {
-                    @Override
-                    public void onSuccess(ScreenshotResult result) {
-                        HardwareBuffer hb = result.getHardwareBuffer();
-                        Bitmap hw = Bitmap.wrapHardwareBuffer(hb, result.getColorSpace());
-                        Bitmap soft = hw == null ? null : hw.copy(Bitmap.Config.ARGB_8888, false);
-                        hb.close();
-                        busy = false;
-                        if (soft == null) {
-                            bubble.setHidden(false);
-                            return;
-                        }
-                        showSelection(soft);
-                        int cx = Math.max(0, Math.min(soft.getWidth() - 1, x));
-                        int cy = Math.max(0, Math.min(soft.getHeight() - 1, y));
-                        if (selection != null) selection.setPress(cx, cy);
-                        autoDetect(cx, cy);
-                    }
-
-                    @Override
-                    public void onFailure(int errorCode) {
-                        busy = false;
-                        bubble.setHidden(false);
-                    }
-                }), 160);
     }
 
     /** "{"box":[ymin,xmin,ymax,xmax],...}" (0-1000) -> padded screen rect, or null. */
