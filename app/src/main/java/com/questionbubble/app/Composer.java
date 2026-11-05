@@ -42,7 +42,9 @@ final class Composer extends LinearLayout {
     private final HorizontalScrollView attachScroll;
     private final LinearLayout attachRow;
     private final EditText input;
-    private final TextView thinkChip, searchChip, modelChip;
+    private final FrameLayout thinkBtn, searchBtn;
+    private final ImageView thinkIcon, searchIcon;
+    private final TextView modelChip;
     private final FrameLayout send;
     private final ImageView sendIcon;
     private final GradientDrawable bg;
@@ -88,6 +90,13 @@ final class Composer extends LinearLayout {
             }
             return false;
         });
+        input.setOnKeyListener((v, keyCode, ev) -> {
+            if (keyCode == KeyEvent.KEYCODE_ENTER && ev.getAction() == KeyEvent.ACTION_UP) {
+                trySend();
+                return true;
+            }
+            return keyCode == KeyEvent.KEYCODE_ENTER;
+        });
         input.setOnFocusChangeListener((v, has) -> {
             bg.setStroke(Math.max(1, dp(1)), has ? 0x52FFFFFF : Theme.HAIRLINE_STRONG);
             if (has) host.onInputFocus();
@@ -113,48 +122,50 @@ final class Composer extends LinearLayout {
         row.setOrientation(HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.addView(circle(R.drawable.ic_plus, () -> host.onAttach()));
-        thinkChip = chip(R.drawable.ic_bulb, "Think");
-        thinkChip.setOnClickListener(v -> {
-            Theme.tick(v);
-            Prefs.setThinking(getContext(), !Prefs.thinking(getContext()));
+        thinkIcon = Theme.icon(c, R.drawable.ic_bulb, Theme.TEXT, 17);
+        thinkBtn = toggle(thinkIcon, "Extended thinking", () -> {
+            boolean on = !Prefs.thinking(getContext());
+            Prefs.setThinking(getContext(), on);
             refresh();
+            flashHint(on ? "Thinking on" : "Thinking off");
         });
-        searchChip = chip(R.drawable.ic_globe, "Search");
-        searchChip.setOnClickListener(v -> {
-            Theme.tick(v);
-            Prefs.setWebSearch(getContext(), !Prefs.webSearch(getContext()));
+        searchIcon = Theme.icon(c, R.drawable.ic_globe, Theme.TEXT, 17);
+        searchBtn = toggle(searchIcon, "Web search", () -> {
+            boolean on = !Prefs.webSearch(getContext());
+            Prefs.setWebSearch(getContext(), on);
             refresh();
+            flashHint(on ? "Web search on" : "Web search off");
         });
-        LayoutParams cp = new LayoutParams(Theme.WRAP, dp(34));
-        cp.leftMargin = dp(6);
-        row.addView(thinkChip, cp);
-        LayoutParams sp2 = new LayoutParams(Theme.WRAP, dp(34));
+        LayoutParams tp = new LayoutParams(dp(34), dp(34));
+        tp.leftMargin = dp(6);
+        row.addView(thinkBtn, tp);
+        LayoutParams sp2 = new LayoutParams(dp(34), dp(34));
         sp2.leftMargin = dp(6);
-        row.addView(searchChip, sp2);
-        View spacer = new View(c);
-        row.addView(spacer, new LayoutParams(0, 1, 1));
+        row.addView(searchBtn, sp2);
 
+        // model name takes whatever room is left and shrinks, so send always fits
         modelChip = Theme.oneLine(Theme.text(c, "", Theme.Type.LABEL));
         modelChip.setTextColor(Theme.TEXT_2);
         modelChip.setTypeface(Fonts.weight(c, 500));
-        modelChip.setGravity(Gravity.CENTER_VERTICAL);
-        modelChip.setMaxWidth(dp(130));
+        modelChip.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
         modelChip.setCompoundDrawablePadding(dp(2));
-        modelChip.setPadding(dp(8), 0, dp(4), 0);
+        modelChip.setPadding(dp(6), 0, dp(4), 0);
         modelChip.setBackground(Theme.ripple(Theme.rounded(0x00000000, dp(14)), dp(14)));
         modelChip.setOnClickListener(v -> {
             Theme.tap(v);
             host.onModel();
         });
-        row.addView(modelChip, new LayoutParams(Theme.WRAP, dp(34)));
+        LayoutParams mp = new LayoutParams(0, dp(34), 1);
+        mp.leftMargin = dp(4);
+        row.addView(modelChip, mp);
 
         send = new FrameLayout(c);
-        sendIcon = Theme.icon(c, R.drawable.ic_arrow_up, Theme.TEXT_3, 18);
+        sendIcon = Theme.icon(c, R.drawable.ic_arrow_up, Theme.TEXT_3, 19);
         send.addView(sendIcon);
-        send.setBackground(Theme.rounded(Theme.FILL, dp(17)));
+        send.setBackground(Theme.rounded(Theme.FILL, dp(18)));
         send.setOnClickListener(v -> trySend());
         Theme.pressable(send, 0.86f);
-        LayoutParams sendLp = new LayoutParams(dp(34), dp(34));
+        LayoutParams sendLp = new LayoutParams(dp(36), dp(36));
         sendLp.leftMargin = dp(6);
         row.addView(send, sendLp);
         addView(row, Theme.lp(Theme.MATCH, Theme.WRAP, dp(2)));
@@ -176,37 +187,45 @@ final class Composer extends LinearLayout {
         return b;
     }
 
-    private TextView chip(int icon, String label) {
-        TextView t = Theme.text(getContext(), label, Theme.Type.LABEL);
-        t.setGravity(Gravity.CENTER_VERTICAL);
-        t.setTypeface(Fonts.weight(getContext(), 500));
-        t.setCompoundDrawablePadding(dp(5));
-        t.setPadding(dp(10), 0, dp(12), 0);
-        t.setTag(icon);
-        Theme.pressable(t, 0.92f);
-        return t;
+    private FrameLayout toggle(ImageView icon, String name, Runnable action) {
+        FrameLayout b = new FrameLayout(getContext());
+        b.addView(icon);
+        b.setContentDescription(name);
+        b.setTooltipText(name);
+        b.setClickable(true);
+        b.setOnClickListener(v -> {
+            Theme.tick(v);
+            action.run();
+        });
+        Theme.pressable(b, 0.88f);
+        return b;
     }
 
-    private void styleChip(TextView t, boolean on) {
-        int fg = on ? Theme.BLACK : Theme.TEXT_2;
-        t.setTextColor(fg);
-        t.setBackground(on ? Theme.rounded(Theme.WHITE, dp(17))
+    private void styleToggle(FrameLayout b, ImageView icon, boolean on) {
+        b.setBackground(on ? Theme.rounded(Theme.WHITE, dp(17))
                 : Theme.rounded(0x00000000, dp(17), Theme.HAIRLINE_STRONG, Math.max(1, dp(1))));
-        android.graphics.drawable.Drawable d = getContext().getDrawable((int) t.getTag());
-        if (d != null) {
-            d = d.mutate();
-            d.setTint(fg);
-            d.setBounds(0, 0, dp(15), dp(15));
-            t.setCompoundDrawables(d, null, null, null);
-        }
+        icon.setImageTintList(ColorStateList.valueOf(on ? Theme.BLACK : Theme.TEXT_2));
+    }
+
+    private final Runnable restoreHint = this::restoreHintNow;
+
+    private void restoreHintNow() {
+        input.setHint("Message " + Prefs.provider(getContext()).label);
+    }
+
+    /** Brief confirmation in the empty text box after a toggle. */
+    private void flashHint(String text) {
+        removeCallbacks(restoreHint);
+        input.setHint(text);
+        postDelayed(restoreHint, 1600);
     }
 
     /** Re-read the selected AI, model and toggles. */
     void refresh() {
         Context c = getContext();
         input.setHint("Message " + Prefs.provider(c).label);
-        styleChip(thinkChip, Prefs.thinking(c));
-        styleChip(searchChip, Prefs.webSearch(c));
+        styleToggle(thinkBtn, thinkIcon, Prefs.thinking(c));
+        styleToggle(searchBtn, searchIcon, Prefs.webSearch(c));
         modelChip.setText(Provider.modelLabel(Prefs.model(c)));
         android.graphics.drawable.Drawable d = c.getDrawable(R.drawable.ic_chevron_down);
         if (d != null) {
@@ -271,7 +290,7 @@ final class Composer extends LinearLayout {
         boolean on = !busy && (input.getText().toString().trim().length() > 0 || !images.isEmpty());
         if (on == sendOn) return;
         sendOn = on;
-        send.setBackground(Theme.rounded(on ? Theme.WHITE : Theme.FILL, dp(17)));
+        send.setBackground(Theme.rounded(on ? Theme.WHITE : Theme.FILL, dp(18)));
         sendIcon.setImageTintList(ColorStateList.valueOf(on ? Theme.BLACK : Theme.TEXT_3));
         send.setScaleX(0.8f);
         send.setScaleY(0.8f);
