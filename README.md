@@ -70,7 +70,11 @@ a bundle signed with your **upload key**. To have GitHub sign it, add these repo
 | `RELEASE_KEY_ALIAS` | key alias |
 | `RELEASE_KEY_PASSWORD` | key password |
 
-Create a keystore once with
+**No computer?** Make the repository private, then run **Actions → Create signing key → Run
+workflow**. Download the `signing-key` artifact (kept for 1 day) and add each file in it as a
+secret, as its READ_ME explains. Back the zip up somewhere safe.
+
+On a computer, create a keystore once with
 `keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000`
 and keep it safe: every future update must be signed with the same key. Without the secrets the
 bundle is built unsigned. The version code goes up automatically with each build.
