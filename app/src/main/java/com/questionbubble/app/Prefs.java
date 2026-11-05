@@ -66,6 +66,7 @@ final class Prefs {
         SharedPreferences p = sp(c);
         migrate(p);
         String m = p.getString("model_" + pr.id, "").trim();
+        if (pr == Provider.GEMINI && (m.startsWith("gemini-2") || m.startsWith("gemini-1"))) m = "";
         return m.isEmpty() ? pr.defaultModel : m;
     }
 

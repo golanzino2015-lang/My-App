@@ -23,11 +23,11 @@ enum Provider {
             }),
 
     GEMINI("gemini", "Gemini", "Google", "AIza...",
-            "https://aistudio.google.com/apikey", "aistudio.google.com", "gemini-2.5-flash",
+            "https://aistudio.google.com/apikey", "aistudio.google.com", "gemini-3.5-flash",
             new String[][]{
-                    {"gemini-2.5-flash", "Fast, great with images"},
-                    {"gemini-2.5-pro", "Most capable"},
-                    {"gemini-2.5-flash-lite", "Fastest and cheapest"},
+                    {"gemini-3.5-flash", "Fast and capable, great with images"},
+                    {"gemini-3.5-flash-lite", "Fastest and cheapest"},
+                    {"gemini-3-flash", "Previous generation"},
             });
 
     final String id, label, company, keyHint, keyUrl, keySite, defaultModel;
@@ -58,9 +58,9 @@ enum Provider {
             case "gpt-4.1": return "GPT-4.1";
             case "gpt-5": return "GPT-5";
             case "gpt-5-mini": return "GPT-5 mini";
-            case "gemini-2.5-flash": return "Gemini 2.5 Flash";
-            case "gemini-2.5-pro": return "Gemini 2.5 Pro";
-            case "gemini-2.5-flash-lite": return "Gemini 2.5 Flash-Lite";
+            case "gemini-3.5-flash": return "Gemini 3.5 Flash";
+            case "gemini-3.5-flash-lite": return "Gemini 3.5 Flash-Lite";
+            case "gemini-3-flash": return "Gemini 3 Flash";
             default: return id;
         }
     }

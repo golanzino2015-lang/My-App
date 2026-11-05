@@ -181,8 +181,15 @@ final class ChatApi {
                         new JSONArray().put(new JSONObject().put("text", CHAT_PROMPT))))
                 .put("contents", contents);
         JSONObject thinkingConfig = new JSONObject();
-        if (think) thinkingConfig.put("includeThoughts", true);
-        else if (!model.contains("pro")) thinkingConfig.put("thinkingBudget", 0);
+        boolean gen3 = model.startsWith("gemini-3");
+        if (think) {
+            thinkingConfig.put("includeThoughts", true);
+            if (gen3) thinkingConfig.put("thinkingLevel", "high");
+        } else if (gen3) {
+            thinkingConfig.put("thinkingLevel", "low");
+        } else if (!model.contains("pro")) {
+            thinkingConfig.put("thinkingBudget", 0);
+        }
         if (thinkingConfig.length() > 0) {
             body.put("generationConfig", new JSONObject().put("thinkingConfig", thinkingConfig));
         }
