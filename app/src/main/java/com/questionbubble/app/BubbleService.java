@@ -39,9 +39,24 @@ public class BubbleService extends AccessibilityService {
     private static final String CROP_PROMPT = "Answer the question shown in this image.";
     private static final String FULL_PROMPT =
             "This is a screenshot of the user's screen. Find the main question on it and answer it.";
-    private static final String POINT_PROMPT =
-            "The user pressed and held on a question in this screenshot. The RED CIRCLE marks where "
-            + "their finger was. Answer only the question at (or closest to) the red circle.";
+    private static final String LOCATE_AND_ANSWER =
+            "This is a screenshot of the user's phone. They pressed and held on it: the RED CIRCLE "
+            + "marks where their finger was. Find the ONE question at or nearest to the red circle "
+            + "(including its answer choices, if it has any) and ignore every other question on the "
+            + "screen. Then answer that question.\n"
+            + "Reply with ONLY this JSON object and nothing else (no code fences):\n"
+            + "{\"box\":[ymin,xmin,ymax,xmax],\"answer\":\"...\"}\n"
+            + "- box: the bounding box of that whole question and its choices, as integers from 0 "
+            + "to 1000 relative to the image's height (y) and width (x).\n"
+            + "- answer: your answer to it, following your usual answer rules.";
+    private static final String LOCATE_ONLY =
+            "This is a screenshot of the user's phone. They pressed and held on it: the RED CIRCLE "
+            + "marks where their finger was. Find the ONE question or block of content at or nearest "
+            + "to the red circle (include answer choices, if any).\n"
+            + "Reply with ONLY this JSON object and nothing else (no code fences):\n"
+            + "{\"box\":[ymin,xmin,ymax,xmax]}\n"
+            + "where box is its bounding box as integers from 0 to 1000 relative to the image's "
+            + "height (y) and width (x).";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -398,6 +413,7 @@ public class BubbleService extends AccessibilityService {
 
             @Override
             public void onCancel() {
+                locateCancelled = true;
                 removeSelection(true);
                 if (chatCaptureId != null) {
                     String id = chatCaptureId;
@@ -444,92 +460,129 @@ public class BubbleService extends AccessibilityService {
         if (bubble != null) bubble.setHidden(false);
     }
 
+    private boolean locateCancelled;
+
     /**
-     * Press-and-hold: find the block of the screen under the finger. First we ask Android which UI
-     * element is there (works in most apps and browsers); otherwise we take a band of the screen
-     * around the finger. A red circle marks the exact spot for the model.
+     * Press-and-hold: the AI looks at the whole screen (with the finger's spot marked), finds the
+     * question nearest to it, and answers it in the same request. The frozen screen shows a
+     * pulsing ring meanwhile, then the found question is highlighted.
      */
     private void autoDetect(int x, int y) {
         Bitmap shot = screenshot;
-        if (shot == null) return;
+        SelectionView sv = selection;
+        if (shot == null || sv == null) return;
+        boolean forChat = chatCaptureId != null;
         int w = shot.getWidth(), h = shot.getHeight();
 
-        Rect area = findQuestionArea(x, y, w, h);
-        if (area == null) {
-            int half = Math.round(h * 0.2f);
-            area = new Rect(0, Math.max(0, y - half), w, Math.min(h, y + half));
-        }
-        int pad = Theme.dp(this, 10);
-        area.inset(-pad, -pad);
-        if (!area.intersect(0, 0, w, h)) area.set(0, 0, w, h);
+        Bitmap marked = shot.copy(Bitmap.Config.ARGB_8888, true);
+        Canvas cv = new Canvas(marked);
+        float r = Math.max(Theme.dp(this, 26), w * 0.04f);
+        Paint red = new Paint(Paint.ANTI_ALIAS_FLAG);
+        red.setStyle(Paint.Style.STROKE);
+        red.setStrokeWidth(Math.max(Theme.dp(this, 4), w * 0.006f));
+        red.setColor(Color.RED);
+        cv.drawCircle(x, y, r, red);
+        red.setStyle(Paint.Style.FILL);
+        cv.drawCircle(x, y, red.getStrokeWidth(), red);
 
-        boolean forChat = chatCaptureId != null;
-        Bitmap crop = Bitmap.createBitmap(shot, area.left, area.top, area.width(), area.height())
-                .copy(Bitmap.Config.ARGB_8888, true);
+        sv.startSearching("Finding the question", forChat ? "Looking where you pressed"
+                : "Asking " + Prefs.provider(this).label, forChat ? "Adding it to your chat" : "Answer copied");
+        locateCancelled = false;
         if (!forChat) {
-            Paint red = new Paint(Paint.ANTI_ALIAS_FLAG);
-            red.setStyle(Paint.Style.STROKE);
-            red.setStrokeWidth(Theme.dp(this, 4));
-            red.setColor(Color.RED);
-            new Canvas(crop).drawCircle(x - area.left, y - area.top, Theme.dp(this, 26), red);
+            busy = true;
+            bubble.setBusy(true);
         }
-
-        Runnable go = () -> {
-            removeSelection(true);
-            if (forChat) deliverToChat(crop);
-            else ask(crop, POINT_PROMPT);
-        };
-        SelectionView sv = selection;
-        if (sv != null) sv.showDetected(area, go);
-        else go.run();
+        boolean detailed = Prefs.detailed(this);
+        worker.execute(() -> {
+            String reply = null;
+            String error = null;
+            try {
+                reply = Ai.ask(this, detailed, forChat ? LOCATE_ONLY : LOCATE_AND_ANSWER, marked);
+            } catch (Exception e) {
+                error = String.valueOf(e.getMessage());
+            } finally {
+                marked.recycle();
+            }
+            String rep = reply, err = error;
+            main.post(() -> {
+                if (!forChat) {
+                    busy = false;
+                    bubble.setBusy(false);
+                }
+                if (locateCancelled || selection != sv || screenshot != shot) return;
+                if (err != null && !forChat) {
+                    removeSelection(true);
+                    bubble.errorShake();
+                    island.show(Island.Kind.ERROR, "Couldn't get an answer", err, 5500);
+                    return;
+                }
+                Rect box = rep == null ? null : parseBox(rep, w, h);
+                Rect area = box != null ? box
+                        : new Rect(0, Math.max(0, y - Math.round(h * 0.15f)), w, Math.min(h, y + Math.round(h * 0.15f)));
+                String answer = forChat ? null : parseAnswer(rep);
+                sv.showDetected(area, () -> {
+                    if (forChat) {
+                        Bitmap crop = Bitmap.createBitmap(shot, area.left, area.top, area.width(), area.height())
+                                .copy(Bitmap.Config.ARGB_8888, false);
+                        removeSelection(true);
+                        deliverToChat(crop);
+                    } else {
+                        removeSelection(true);
+                        finishAnswer(answer);
+                    }
+                });
+            });
+        });
     }
 
-    private Rect findQuestionArea(int x, int y, int screenW, int screenH) {
+    /** "{"box":[ymin,xmin,ymax,xmax],...}" (0-1000) -> padded screen rect, or null. */
+    private Rect parseBox(String reply, int w, int h) {
         try {
-            List<AccessibilityWindowInfo> windows = getWindows();
-            for (AccessibilityWindowInfo win : windows) {
-                if (win.getType() != AccessibilityWindowInfo.TYPE_APPLICATION) continue;
-                Rect wb = new Rect();
-                win.getBoundsInScreen(wb);
-                if (!wb.contains(x, y)) continue;
-                AccessibilityNodeInfo root = win.getRoot();
-                if (root == null) continue;
-                AccessibilityNodeInfo node = deepestAt(root, x, y);
-                if (node == null) continue;
+            int s0 = reply.indexOf('{'), e0 = reply.lastIndexOf('}');
+            if (s0 < 0 || e0 <= s0) return null;
+            org.json.JSONArray b = new org.json.JSONObject(reply.substring(s0, e0 + 1)).optJSONArray("box");
+            if (b == null || b.length() != 4) return null;
+            double y0 = b.getDouble(0), x0 = b.getDouble(1), y1 = b.getDouble(2), x1 = b.getDouble(3);
+            double scale = Math.max(Math.max(y0, y1), Math.max(x0, x1)) <= 1.5 ? 1.0 : 1000.0;
+            int top = (int) Math.round(Math.min(y0, y1) / scale * h);
+            int bottom = (int) Math.round(Math.max(y0, y1) / scale * h);
+            int left = (int) Math.round(Math.min(x0, x1) / scale * w);
+            int right = (int) Math.round(Math.max(x0, x1) / scale * w);
+            Rect r = new Rect(left, top, right, bottom);
+            int pad = Theme.dp(this, 10);
+            r.inset(-pad, -pad);
+            if (!r.intersect(0, 0, w, h)) return null;
+            if (r.width() < w * 0.08f || r.height() < Theme.dp(this, 24)) return null;
+            return r;
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
-                Rect best = null;
-                AccessibilityNodeInfo cur = node;
-                while (cur != null) {
-                    Rect b = new Rect();
-                    cur.getBoundsInScreen(b);
-                    if (b.height() > screenH * 0.55f) break;
-                    best = b;
-                    if (b.height() >= screenH * 0.14f && b.width() >= screenW * 0.5f) break;
-                    cur = cur.getParent();
-                }
-                if (best != null && best.height() >= screenH * 0.04f && best.width() >= screenW * 0.3f) {
-                    return best;
-                }
+    private static String parseAnswer(String reply) {
+        if (reply == null) return "";
+        try {
+            int s0 = reply.indexOf('{'), e0 = reply.lastIndexOf('}');
+            if (s0 >= 0 && e0 > s0) {
+                String a = new org.json.JSONObject(reply.substring(s0, e0 + 1)).optString("answer", "").trim();
+                if (!a.isEmpty()) return a;
             }
         } catch (Exception ignored) {
         }
-        return null;
+        return reply.replaceAll("(?s)```(json)?", "").trim();
     }
 
-    private AccessibilityNodeInfo deepestAt(AccessibilityNodeInfo node, int x, int y) {
-        Rect b = new Rect();
-        node.getBoundsInScreen(b);
-        if (!b.contains(x, y)) return null;
-        for (int i = node.getChildCount() - 1; i >= 0; i--) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (child == null || !child.isVisibleToUser()) continue;
-            AccessibilityNodeInfo hit = deepestAt(child, x, y);
-            if (hit != null) return hit;
+    private void finishAnswer(String answer) {
+        if (answer == null || answer.isEmpty()) {
+            bubble.errorShake();
+            island.show(Island.Kind.ERROR, "Couldn't get an answer", "Try again or drag a box around it", 4500);
+            return;
         }
-        return node;
+        History.add(this, "scan", "", answer);
+        copy(answer);
+        bubble.celebrate();
+        island.show(Island.Kind.SUCCESS, "Copied to clipboard", answer, 5000);
     }
-
-    // ---------------------------------------------------------------- answer
 
     private void ask(Bitmap image, String prompt) {
         busy = true;

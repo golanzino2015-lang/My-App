@@ -62,7 +62,10 @@ final class SelectionView extends View {
     private float hold;          // 0..1 ring progress
     private int pressedBtn;      // 0 none, 1 cancel, 2 full
     private RectF detected;      // animated detect rect (screen coords)
-    private ValueAnimator holdAnim, chromeAnim;
+    private ValueAnimator holdAnim, chromeAnim, pulseAnim;
+    private boolean searching;   // waiting for the AI to find the question
+    private float pulse;
+    private String statusTitle, statusSub, foundSub;
 
     SelectionView(Context c, Bitmap shot, Listener l) {
         super(c);
@@ -148,6 +151,11 @@ final class SelectionView extends View {
     }
 
     private RectF cancelBtn() {
+        if (searching) {
+            float h = 52 * d, w = 140 * d;
+            float bottom = getHeight() - bottomInset() - 28 * d;
+            return new RectF(getWidth() / 2f - w / 2, bottom - h, getWidth() / 2f + w / 2, bottom);
+        }
         float h = 52 * d, w = 120 * d, gap = 10 * d;
         float total = w + gap + 168 * d;
         float left = getWidth() / 2f - total / 2f;
@@ -197,6 +205,19 @@ final class SelectionView extends View {
             }
         }
 
+        if (searching && detected == null) {
+            float R = 30 * d;
+            ring.setAlpha(255);
+            canvas.drawCircle(startX, startY, R, ring);
+            for (int k = 0; k < 2; k++) {
+                float p = (pulse + k * 0.5f) % 1f;
+                ringTrack.setAlpha(Math.round(200 * (1f - p)));
+                canvas.drawCircle(startX, startY, R + p * 46 * d, ringTrack);
+            }
+            ringTrack.setAlpha(0x4D);
+            dot.setAlpha(255);
+            canvas.drawCircle(startX, startY, 5 * d, dot);
+        }
         if (holding && hold > 0f) {
             float R = 30 * d;
             canvas.drawCircle(startX, startY, R, ringTrack);
@@ -251,8 +272,8 @@ final class SelectionView extends View {
     private void drawChrome(Canvas canvas, float a) {
         int alpha = Math.round(255 * a);
         // instruction card
-        String t = detected != null ? "Question found" : "Select a question";
-        String s = detected != null ? "Getting your answer" : "Drag to crop, or press and hold on it";
+        String t = detected != null ? "Question found" : searching && statusTitle != null ? statusTitle : "Select a question";
+        String s = detected != null ? (foundSub != null ? foundSub : "Answer copied") : searching && statusSub != null ? statusSub : "Drag to crop, or press and hold on it";
         float iconS = 20 * d, padL = 18 * d, gap = 14 * d;
         float textW = Math.max(titleP.measureText(t), subP.measureText(s));
         float w = Math.min(getWidth() - 32 * d, padL + iconS + gap + textW + 22 * d);
@@ -276,6 +297,18 @@ final class SelectionView extends View {
         canvas.drawText(s, tx, card.top + 49 * d, subP);
 
         if (detected != null) return;
+        if (searching) {
+            RectF cb = cancelBtn();
+            float pc = pressedBtn == 1 ? 0.96f : 1f;
+            canvas.save();
+            canvas.scale(pc, pc, cb.centerX(), cb.centerY());
+            canvas.drawRoundRect(cb, cb.height() / 2, cb.height() / 2, glass);
+            canvas.drawRoundRect(cb, cb.height() / 2, cb.height() / 2, glassStroke);
+            btnDark.setAlpha(alpha);
+            canvas.drawText("Cancel", cb.centerX(), cb.centerY() - (btnDark.descent() + btnDark.ascent()) / 2, btnDark);
+            canvas.restore();
+            return;
+        }
 
         // bottom buttons
         RectF cb = cancelBtn(), fb = fullBtn();
@@ -352,6 +385,21 @@ final class SelectionView extends View {
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(MotionEvent e) {
+        if (searching && detected == null) {
+            float sx = e.getX(), sy = e.getY();
+            if (e.getActionMasked() == MotionEvent.ACTION_DOWN && cancelBtn().contains(sx, sy)) {
+                pressedBtn = 1;
+                invalidate();
+            } else if (e.getActionMasked() == MotionEvent.ACTION_UP && pressedBtn == 1) {
+                pressedBtn = 0;
+                invalidate();
+                if (cancelBtn().contains(sx, sy)) {
+                    stopPulse();
+                    listener.onCancel();
+                }
+            }
+            return true;
+        }
         if (done) return true;
         float vx = e.getX(), vy = e.getY();
         switch (e.getActionMasked()) {
@@ -424,8 +472,39 @@ final class SelectionView extends View {
         return super.onTouchEvent(e);
     }
 
+    /** After a press-and-hold: pulse at the finger while the AI looks for the question. */
+    void startSearching(String title, String sub, String whenFound) {
+        foundSub = whenFound;
+        done = true;
+        holding = false;
+        searching = true;
+        statusTitle = title;
+        statusSub = sub;
+        setChrome(1f);
+        pulseAnim = ValueAnimator.ofFloat(0f, 1f);
+        pulseAnim.setDuration(1400);
+        pulseAnim.setRepeatCount(ValueAnimator.INFINITE);
+        pulseAnim.setInterpolator(new android.view.animation.LinearInterpolator());
+        pulseAnim.addUpdateListener(v -> {
+            pulse = (float) v.getAnimatedValue();
+            invalidate();
+        });
+        pulseAnim.start();
+    }
+
+    private void stopPulse() {
+        if (pulseAnim != null) pulseAnim.cancel();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        stopPulse();
+        super.onDetachedFromWindow();
+    }
+
     /** Grow the found area out from the finger, then call {@code onShown}. */
     void showDetected(Rect target, Runnable onShown) {
+        stopPulse();
         done = true;
         setChrome(1f);
         float s = 40 * d;
