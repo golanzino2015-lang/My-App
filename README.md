@@ -1,4 +1,4 @@
-# Question Bubble (Android)
+# My App (Android)
 
 A floating orb that sits on top of every app. Point it at a question on your screen and the answer
 lands on your clipboard. Choose **ChatGPT** (OpenAI), **Claude** (Anthropic) or **Gemini** (Google);
@@ -83,8 +83,8 @@ bundle is built unsigned. The version code goes up automatically with each build
 
 The app walks you through this the first time you open it:
 
-1. **Allow screen access.** Accessibility → Question Bubble → on.
-   - If the switch is greyed out (Android 13 and newer), go to *Settings → Apps → Question Bubble
+1. **Allow screen access.** Accessibility → My App → on.
+   - If the switch is greyed out (Android 13 and newer), go to *Settings → Apps → My App
      → ⋮ → Allow restricted settings*.
 2. **Choose your AI and paste its API key.** Keys are stored only on the phone and only sent to
    that company's API.

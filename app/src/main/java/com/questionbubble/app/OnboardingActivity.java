@@ -190,7 +190,7 @@ public class OnboardingActivity extends Activity {
                 setLabels("Verify key", "Skip for now");
                 break;
             default:
-                setLabels("Start using Question Bubble", null);
+                setLabels("Start using My App", null);
         }
     }
 
@@ -297,7 +297,7 @@ public class OnboardingActivity extends Activity {
         p.setOrientation(LinearLayout.VERTICAL);
         switch (idx) {
             case 0: {
-                parts.add(add(p, Theme.text(this, "Question Bubble", Theme.Type.OVERLINE), 0));
+                parts.add(add(p, Theme.text(this, "My App", Theme.Type.OVERLINE), 0));
                 parts.add(add(p, Theme.text(this, "Answers that float above everything.", Theme.Type.DISPLAY), 14));
                 parts.add(add(p, Theme.text(this, "Point at any question on your screen. The answer lands on your clipboard in seconds.", Theme.Type.BODY), 14));
                 break;
@@ -305,7 +305,7 @@ public class OnboardingActivity extends Activity {
             case 1: {
                 parts.add(add(p, Theme.text(this, "Step 1 of 2", Theme.Type.OVERLINE), 0));
                 parts.add(add(p, Theme.text(this, "Allow screen access", Theme.Type.HEADLINE), 12));
-                parts.add(add(p, Theme.text(this, "Turn on Question Bubble in Accessibility, the same permission auto-clickers use.", Theme.Type.BODY), 10));
+                parts.add(add(p, Theme.text(this, "Turn on My App in Accessibility, the same permission auto-clickers use.", Theme.Type.BODY), 10));
                 parts.add(add(p, feature(R.drawable.ic_layers, "Floats over every app", "Reach it from anywhere"), 22));
                 parts.add(add(p, feature(R.drawable.ic_scan, "Sees only what you select", "Nothing is captured until you scan"), 14));
                 parts.add(add(p, feature(R.drawable.ic_lock, "Private by design", "Images go only to the AI you pick, with your key"), 14));

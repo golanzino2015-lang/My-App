@@ -226,7 +226,7 @@ final class Sheets {
         step(a, steps, "1", "Open App info below");
         step(a, steps, "2", "Tap the ⋮ menu in the top-right corner");
         step(a, steps, "3", "Choose Allow restricted settings");
-        step(a, steps, "4", "Come back and turn Question Bubble on");
+        step(a, steps, "4", "Come back and turn My App on");
         s.add(steps, 18);
         TextView note = Theme.text(a, "Don't see the option? Try switching access on once so Android shows its warning, then check again.", Theme.Type.CAPTION);
         s.add(note, 14);

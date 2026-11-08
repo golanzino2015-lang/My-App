@@ -641,7 +641,7 @@ public class ChatActivity extends Activity {
         if (busy) return;
         BubbleService svc = BubbleService.instance;
         if (svc == null) {
-            Snack.show(this, "Turn on screen access in Question Bubble first", R.drawable.ic_alert);
+            Snack.show(this, "Turn on screen access in My App first", R.drawable.ic_alert);
             return;
         }
         draftText = composer.text();
@@ -750,7 +750,7 @@ public class ChatActivity extends Activity {
         LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(20), dp(20));
         ip.rightMargin = dp(12);
         settings.addView(ic, ip);
-        settings.addView(Theme.text(this, "Question Bubble settings", Theme.Type.CALLOUT));
+        settings.addView(Theme.text(this, "My App settings", Theme.Type.CALLOUT));
         settings.setClickable(true);
         settings.setOnClickListener(v -> {
             closeDrawer();

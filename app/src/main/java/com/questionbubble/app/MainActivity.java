@@ -254,7 +254,7 @@ public class MainActivity extends Activity {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = Theme.text(this, "Question Bubble", Theme.Type.HEADLINE);
+        TextView title = Theme.text(this, "My App", Theme.Type.HEADLINE);
         bar.addView(title, new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
         View chatBtn = Rows.iconButton(this, R.drawable.ic_message, () -> pager.goTo(1, true));
         LinearLayout.LayoutParams cbp = new LinearLayout.LayoutParams(dp(42), dp(42));
@@ -418,7 +418,7 @@ public class MainActivity extends Activity {
                         })));
         add(gen, 10, step++);
 
-        TextView foot = Theme.text(this, "Question Bubble · Version 1.0", Theme.Type.LABEL);
+        TextView foot = Theme.text(this, "My App · Version 1.0", Theme.Type.LABEL);
         foot.setTextColor(Theme.TEXT_3);
         foot.setGravity(Gravity.CENTER);
         add(foot, 30, step);

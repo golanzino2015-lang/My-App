@@ -45,7 +45,7 @@ final class ChatApi {
 
     /** Fixed for every chat request, so Claude's saved reasoning stays valid across turns. */
     static final String CHAT_PROMPT =
-            "You are a helpful assistant inside Question Bubble, a phone app. Answer clearly and "
+            "You are a helpful assistant inside My App, a phone app. Answer clearly and "
             + "concisely, in short paragraphs. Use simple formatting only: **bold**, bullet lists, "
             + "headings and `code`. When the user shares a screenshot, focus on what they ask about it.";
 
@@ -55,7 +55,7 @@ final class ChatApi {
         String model = Prefs.model(c, p);
         boolean think = Prefs.thinking(c);
         boolean search = Prefs.webSearch(c);
-        if (key.isEmpty()) throw new Exception("Add your " + p.label + " API key in Question Bubble.");
+        if (key.isEmpty()) throw new Exception("Add your " + p.label + " API key in My App.");
         long start = System.currentTimeMillis();
         Chats.Msg m;
         switch (p) {
@@ -386,7 +386,7 @@ final class ChatApi {
             if (!strip) throw new StaleHistory();
             throw new Exception("Claude couldn't process this chat. Try a new chat.");
         } catch (UnauthorizedException e) {
-            throw new Exception("That Claude API key was rejected. Check it in Question Bubble.");
+            throw new Exception("That Claude API key was rejected. Check it in My App.");
         } catch (PermissionDeniedException e) {
             throw new Exception("Your Anthropic key doesn't have access to this model.");
         } catch (NotFoundException e) {

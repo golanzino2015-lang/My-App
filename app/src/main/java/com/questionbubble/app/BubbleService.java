@@ -119,7 +119,7 @@ public class BubbleService extends AccessibilityService {
             @Override
             public void onDismissed() {
                 Prefs.setBubbleVisible(BubbleService.this, false);
-                island.show(Island.Kind.INFO, "Bubble hidden", "Open Question Bubble to bring it back", 3200);
+                island.show(Island.Kind.INFO, "Bubble hidden", "Open My App to bring it back", 3200);
             }
         });
         Prefs.sp(this).registerOnSharedPreferenceChangeListener(prefListener);
@@ -280,7 +280,7 @@ public class BubbleService extends AccessibilityService {
                     public void needKey() {
                         saveMenuDraft();
                         closeMenu();
-                        island.show(Island.Kind.INFO, "Add that AI's key first", "Opening Question Bubble", 3000);
+                        island.show(Island.Kind.INFO, "Add that AI's key first", "Opening My App", 3000);
                         openApp();
                     }
 
@@ -641,7 +641,7 @@ public class BubbleService extends AccessibilityService {
 
     private boolean checkKey() {
         if (!Prefs.apiKey(this).isEmpty()) return true;
-        island.show(Island.Kind.INFO, "Add your " + Prefs.provider(this).label + " key", "Opening Question Bubble", 3000);
+        island.show(Island.Kind.INFO, "Add your " + Prefs.provider(this).label + " key", "Opening My App", 3000);
         openApp();
         return false;
     }
