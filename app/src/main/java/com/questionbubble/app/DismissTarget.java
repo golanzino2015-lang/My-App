@@ -48,7 +48,7 @@ final class DismissTarget {
         root.addView(scrim, new FrameLayout.LayoutParams(Theme.MATCH, Theme.MATCH));
 
         circle = new FrameLayout(c);
-        circleBg = Theme.rounded(0xCC1A1A1A, Theme.dp(c, 34), Theme.HAIRLINE_STRONG, Math.max(1, Theme.dp(c, 1)));
+        circleBg = Theme.rounded(((Theme.SURFACE_3 & 0x00FFFFFF) | 0xCC000000), Theme.dp(c, 34), Theme.HAIRLINE_STRONG, Math.max(1, Theme.dp(c, 1)));
         circle.setBackground(circleBg);
         icon = Theme.icon(c, R.drawable.ic_x, Theme.TEXT, 24);
         circle.addView(icon);
@@ -86,7 +86,7 @@ final class DismissTarget {
         active = on;
         circle.animate().scaleX(on ? 1.28f : 1f).scaleY(on ? 1.28f : 1f).setDuration(320)
                 .setInterpolator(new android.view.animation.OvershootInterpolator(2f)).start();
-        circleBg.setColor(on ? Theme.ACCENT : 0xCC1A1A1A);
+        circleBg.setColor(on ? Theme.ACCENT : ((Theme.SURFACE_3 & 0x00FFFFFF) | 0xCC000000));
         icon.setImageTintList(android.content.res.ColorStateList.valueOf(on ? Theme.BLACK : Theme.TEXT));
     }
 

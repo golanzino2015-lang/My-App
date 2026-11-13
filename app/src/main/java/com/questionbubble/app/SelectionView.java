@@ -92,7 +92,7 @@ final class SelectionView extends View {
         ring.setStrokeCap(Paint.Cap.ROUND);
         ring.setColor(Theme.ACCENT);
         dot.setColor(Theme.ACCENT);
-        glass.setColor(0xF0141414);
+        glass.setColor((Theme.PANEL & 0x00FFFFFF) | 0xF0000000);
         glassStroke.setStyle(Paint.Style.STROKE);
         glassStroke.setStrokeWidth(Math.max(1f, 0.8f * d));
         glassStroke.setColor(Theme.HAIRLINE_STRONG);

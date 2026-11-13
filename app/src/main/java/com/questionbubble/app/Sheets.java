@@ -23,7 +23,7 @@ final class Sheets {
     /** Grid of color themes. Picking one re-colors the app and the bubble. */
     static void themePicker(Activity a, Runnable onChanged) {
         Sheet s = new Sheet(a);
-        s.title("Theme color", "Changes buttons, switches, the bubble and the orb.");
+        s.title("Theme color", "Colors the whole app: backgrounds, cards, the chat, the bubble menu and the orb.");
         String current = Prefs.theme(a);
         LinearLayout grid = new LinearLayout(a);
         grid.setOrientation(LinearLayout.VERTICAL);

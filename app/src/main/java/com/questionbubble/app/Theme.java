@@ -26,7 +26,8 @@ import android.widget.TextView;
 final class Theme {
 
     // ---------------------------------------------------------------- color
-    static final int BG = 0xFF000000;
+    static int BG = 0xFF000000;
+    static int PANEL = 0xFF121212; // floating panels: bubble menu, status pill, scan cards
     // surfaces are tinted very slightly toward the theme color (see apply)
     static int SURFACE = 0xFF0E0E0E;
     static int SURFACE_2 = 0xFF151515;
@@ -49,21 +50,33 @@ final class Theme {
     // the orb's body gradient, center highlight to edge
     static int[] ORB = {0xFF6E6E6E, 0xFF2E2E2E, 0xFF0E0E0E, 0xFF030303};
 
-    /** Load the saved theme. Called at app start and when the user picks a new one. */
+    /**
+     * Load the saved theme. Called at app start and when the user picks a new one. Classic is
+     * black and white; every other theme colors the whole app: background, cards, panels and orb.
+     */
     static void apply(Context c) {
         Palette p = Palette.get(Prefs.theme(c));
         CLASSIC = p.isClassic();
         ACCENT = p.base;
         ACCENT_LIGHT = p.light;
         ACCENT_DARK = p.dark;
-        float tint = CLASSIC ? 0f : 0.045f;
-        SURFACE = ToggleView.blend(0xFF0E0E0E, p.base, tint);
-        SURFACE_2 = ToggleView.blend(0xFF151515, p.base, tint);
-        SURFACE_3 = ToggleView.blend(0xFF1C1C1C, p.base, tint);
-        ORB = CLASSIC
-                ? new int[]{0xFF6E6E6E, 0xFF2E2E2E, 0xFF0E0E0E, 0xFF030303}
-                : new int[]{ToggleView.blend(p.light, 0xFFFFFFFF, 0.15f), p.base,
-                ToggleView.blend(p.dark, 0xFF000000, 0.6f), ToggleView.blend(p.dark, 0xFF000000, 0.9f)};
+        if (CLASSIC) {
+            BG = 0xFF000000;
+            SURFACE = 0xFF0E0E0E;
+            SURFACE_2 = 0xFF151515;
+            SURFACE_3 = 0xFF1C1C1C;
+            PANEL = 0xFF121212;
+            ORB = new int[]{0xFF6E6E6E, 0xFF2E2E2E, 0xFF0E0E0E, 0xFF030303};
+        } else {
+            // deep shades of the theme color for backgrounds, brighter ones for raised surfaces
+            BG = ToggleView.blend(p.dark, BLACK, 0.78f);
+            SURFACE = ToggleView.blend(p.dark, BLACK, 0.68f);
+            SURFACE_2 = ToggleView.blend(p.dark, BLACK, 0.62f);
+            SURFACE_3 = ToggleView.blend(p.dark, BLACK, 0.54f);
+            PANEL = ToggleView.blend(p.dark, BLACK, 0.66f);
+            // a bright, fully colored metallic orb
+            ORB = new int[]{ToggleView.blend(p.light, WHITE, 0.4f), p.light, p.base, p.dark};
+        }
     }
 
     /** Metallic fill in the theme color (plain white for Classic). */

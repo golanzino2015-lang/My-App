@@ -55,7 +55,7 @@ final class Composer extends LinearLayout {
         this.host = host;
         setOrientation(VERTICAL);
         setPadding(dp(8), dp(8), dp(8), dp(8));
-        bg = Theme.rounded(0xFF181818, dp(28), Theme.HAIRLINE_STRONG, Math.max(1, dp(1)));
+        bg = Theme.rounded(Theme.SURFACE_2, dp(28), Theme.HAIRLINE_STRONG, Math.max(1, dp(1)));
         setBackground(bg);
 
         attachScroll = new HorizontalScrollView(c);

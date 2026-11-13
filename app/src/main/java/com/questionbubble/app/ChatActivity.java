@@ -437,7 +437,7 @@ public class ChatActivity extends Activity {
             t.setPadding(dp(16), dp(11), dp(16), dp(11));
             float R = dp(22), r = dp(7);
             android.graphics.drawable.GradientDrawable ub = new android.graphics.drawable.GradientDrawable();
-            ub.setColor(ToggleView.blend(0xFF232323, Theme.ACCENT, Theme.CLASSIC ? 0f : 0.22f));
+            ub.setColor(Theme.CLASSIC ? 0xFF232323 : ToggleView.blend(Theme.SURFACE_3, Theme.ACCENT, 0.3f));
             ub.setCornerRadii(new float[]{R, R, R, R, r, r, R, R});
             t.setBackground(ub);
             t.setOnLongClickListener(v -> {
@@ -881,7 +881,7 @@ public class ChatActivity extends Activity {
         root.addView(drawerScrim, new FrameLayout.LayoutParams(Theme.MATCH, Theme.MATCH));
 
         drawer = new FrameLayout(this);
-        drawer.setBackgroundColor(0xFF0B0B0B);
+        drawer.setBackgroundColor(Theme.SURFACE);
         drawer.setClickable(true);
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
