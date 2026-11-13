@@ -48,7 +48,8 @@ final class Sheet {
         sheet.setOrientation(LinearLayout.VERTICAL);
         float r = Theme.dp(a, 30);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Theme.SURFACE_2);
+        bg.setColors(new int[]{Theme.PANEL_A, Theme.PANEL_B});
+        bg.setOrientation(GradientDrawable.Orientation.TOP_BOTTOM);
         bg.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
         bg.setStroke(Math.max(1, Theme.dp(a, 0.8f)), Theme.HAIRLINE);
         sheet.setBackground(bg);

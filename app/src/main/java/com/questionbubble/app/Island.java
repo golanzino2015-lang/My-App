@@ -102,7 +102,7 @@ final class Island {
         pill.setOrientation(LinearLayout.HORIZONTAL);
         pill.setGravity(Gravity.CENTER_VERTICAL);
         pill.setPadding(Theme.dp(c, 8), Theme.dp(c, 8), Theme.dp(c, 22), Theme.dp(c, 8));
-        pill.setBackground(Theme.rounded(Theme.PANEL, Theme.dp(c, 30), Theme.HAIRLINE_STRONG, Math.max(1, Theme.dp(c, 0.8f))));
+        pill.setBackground(Theme.panelFill(Theme.dp(c, 30), Math.max(1, Theme.dp(c, 0.8f)), 0xFF));
         Theme.elevate(pill, 18, 30);
         pill.setLayoutTransition(new android.animation.LayoutTransition());
         pill.setMinimumWidth(Theme.dp(c, 200));

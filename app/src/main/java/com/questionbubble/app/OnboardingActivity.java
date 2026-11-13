@@ -52,7 +52,7 @@ public class OnboardingActivity extends Activity {
         Fonts.init(this);
 
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Theme.BG);
+        root.setBackground(Theme.background(this));
 
         LinearLayout column = new LinearLayout(this);
         column.setOrientation(LinearLayout.VERTICAL);

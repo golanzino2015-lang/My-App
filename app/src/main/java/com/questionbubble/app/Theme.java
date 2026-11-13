@@ -28,6 +28,11 @@ final class Theme {
     // ---------------------------------------------------------------- color
     static int BG = 0xFF000000;
     static int PANEL = 0xFF121212; // floating panels: bubble menu, status pill, scan cards
+    // background gradient (top is the most colorful)
+    static int BG_TOP = 0xFF000000, BG_BOTTOM = 0xFF000000;
+    // card / panel gradients and their light edge
+    static int CARD_A = 0xFF0E0E0E, CARD_B = 0xFF0E0E0E, PANEL_A = 0xFF121212, PANEL_B = 0xFF121212;
+    static int EDGE = 0x17FFFFFF;
     // surfaces are tinted very slightly toward the theme color (see apply)
     static int SURFACE = 0xFF0E0E0E;
     static int SURFACE_2 = 0xFF151515;
@@ -66,6 +71,10 @@ final class Theme {
             SURFACE_2 = 0xFF151515;
             SURFACE_3 = 0xFF1C1C1C;
             PANEL = 0xFF121212;
+            BG_TOP = BG_BOTTOM = BG;
+            CARD_A = CARD_B = SURFACE;
+            PANEL_A = PANEL_B = PANEL;
+            EDGE = HAIRLINE;
             ORB = new int[]{0xFF6E6E6E, 0xFF2E2E2E, 0xFF0E0E0E, 0xFF030303};
         } else {
             // deep shades of the theme color for backgrounds, brighter ones for raised surfaces
@@ -74,6 +83,13 @@ final class Theme {
             SURFACE_2 = ToggleView.blend(p.dark, BLACK, 0.62f);
             SURFACE_3 = ToggleView.blend(p.dark, BLACK, 0.54f);
             PANEL = ToggleView.blend(p.dark, BLACK, 0.66f);
+            BG_TOP = ToggleView.blend(p.base, BLACK, 0.56f);
+            BG_BOTTOM = ToggleView.blend(p.dark, BLACK, 0.88f);
+            CARD_A = ToggleView.blend(p.base, BLACK, 0.58f);
+            CARD_B = ToggleView.blend(p.dark, BLACK, 0.74f);
+            PANEL_A = ToggleView.blend(p.base, BLACK, 0.5f);
+            PANEL_B = ToggleView.blend(p.dark, BLACK, 0.72f);
+            EDGE = (p.light & 0x00FFFFFF) | 0x38000000;
             // a bright, fully colored metallic orb
             ORB = new int[]{ToggleView.blend(p.light, WHITE, 0.4f), p.light, p.base, p.dark};
         }
@@ -176,9 +192,39 @@ final class Theme {
         return g;
     }
 
-    /** Standard card: near-black surface, hairline border, 24dp corners. */
+    /** Standard card: a soft diagonal gradient in the theme color, light edge, 24dp corners. */
     static GradientDrawable card(Context c) {
-        return rounded(SURFACE, dp(c, 24), HAIRLINE, Math.max(1, dp(c, 0.8f)));
+        return cardFill(dp(c, 24), Math.max(1, dp(c, 0.8f)));
+    }
+
+    static GradientDrawable cardFill(float radiusPx, int edgePx) {
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{CARD_A, CARD_B});
+        g.setCornerRadius(radiusPx);
+        g.setStroke(edgePx, EDGE);
+        return g;
+    }
+
+    /** Floating panels (bubble menu, sheets, message box, status pill). */
+    static GradientDrawable panelFill(float radiusPx, int edgePx, int alpha) {
+        int a = (alpha & 0xFF) << 24;
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{(PANEL_A & 0x00FFFFFF) | a, (PANEL_B & 0x00FFFFFF) | a});
+        g.setCornerRadius(radiusPx);
+        if (edgePx > 0) g.setStroke(edgePx, CLASSIC ? HAIRLINE_STRONG : EDGE);
+        return g;
+    }
+
+    /** Full-screen background: a vertical gradient with a soft glow of the color at the top. */
+    static android.graphics.drawable.Drawable background(Context c) {
+        if (CLASSIC) return new android.graphics.drawable.ColorDrawable(BG);
+        GradientDrawable base = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{BG_TOP, BG, BG_BOTTOM});
+        GradientDrawable glow = new GradientDrawable();
+        glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        glow.setColors(new int[]{(ACCENT_LIGHT & 0x00FFFFFF) | 0x40000000, 0x00000000});
+        glow.setGradientCenter(0.85f, 0.02f);
+        glow.setGradientRadius(dp(c, 440));
+        return new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{base, glow});
     }
 
     /** Rounded clip + elevation shadow for a view with a rounded background. */

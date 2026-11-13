@@ -76,7 +76,7 @@ final class MenuPopover {
         panel = new LinearLayout(c);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(10), dp(10), dp(10), dp(10));
-        panel.setBackground(Theme.rounded((Theme.PANEL & 0x00FFFFFF) | 0xF5000000, dp(28), Theme.HAIRLINE_STRONG, Math.max(1, dp(0.8f))));
+        panel.setBackground(Theme.panelFill(dp(28), Math.max(1, dp(0.8f)), 0xF5));
         Theme.elevate(panel, 24, 28);
 
         List<View> stagger = new ArrayList<>();

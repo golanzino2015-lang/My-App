@@ -25,7 +25,7 @@ public class HistoryActivity extends Activity {
         getWindow().setDecorFitsSystemWindows(false);
         Fonts.init(this);
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(Theme.BG);
+        scroll.setBackground(Theme.background(this));
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         scroll.setFillViewport(true);

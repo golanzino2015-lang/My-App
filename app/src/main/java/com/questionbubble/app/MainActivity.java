@@ -40,7 +40,7 @@ public class MainActivity extends Activity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Theme.BG);
+        root.setBackground(Theme.background(this));
         Theme.insets(root, true, true, true);
 
         // Home | Chats tabs (swipe sideways to switch, like a feed app)

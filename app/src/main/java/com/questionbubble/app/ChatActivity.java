@@ -75,7 +75,7 @@ public class ChatActivity extends Activity {
         Fonts.init(this);
 
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Theme.BG);
+        root.setBackground(Theme.background(this));
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -98,11 +98,11 @@ public class ChatActivity extends Activity {
         // soft fades so messages slide under the bars
         View topFade = new View(this);
         topFade.setBackground(new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Theme.BG, 0x00000000}));
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Theme.BG_TOP, Theme.BG_TOP & 0x00FFFFFF}));
         stage.addView(topFade, new FrameLayout.LayoutParams(Theme.MATCH, dp(18), Gravity.TOP));
         View bottomFade = new View(this);
         bottomFade.setBackground(new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.BOTTOM_TOP, new int[]{Theme.BG, 0x00000000}));
+                android.graphics.drawable.GradientDrawable.Orientation.BOTTOM_TOP, new int[]{Theme.BG_BOTTOM, Theme.BG_BOTTOM & 0x00FFFFFF}));
         stage.addView(bottomFade, new FrameLayout.LayoutParams(Theme.MATCH, dp(28), Gravity.BOTTOM));
 
         // jump to the latest message
@@ -881,7 +881,7 @@ public class ChatActivity extends Activity {
         root.addView(drawerScrim, new FrameLayout.LayoutParams(Theme.MATCH, Theme.MATCH));
 
         drawer = new FrameLayout(this);
-        drawer.setBackgroundColor(Theme.SURFACE);
+        drawer.setBackground(Theme.background(this));
         drawer.setClickable(true);
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
