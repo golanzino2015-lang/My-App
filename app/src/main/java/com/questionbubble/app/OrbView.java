@@ -34,7 +34,7 @@ final class OrbView extends View implements Choreographer.FrameCallback {
         renderer = new OrbRenderer(c.getResources().getDisplayMetrics().density);
         margin = Theme.dp(c, marginDp);
         ripplePaint.setStyle(Paint.Style.STROKE);
-        ripplePaint.setColor(Theme.WHITE);
+        ripplePaint.setColor(Theme.ACCENT);
         lastWake = System.currentTimeMillis();
     }
 

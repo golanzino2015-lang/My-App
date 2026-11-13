@@ -133,30 +133,44 @@ final class MenuPopover {
         }
 
         // ---- page 2: chat
+        TextView hello = Theme.text(c, "Ask " + Prefs.provider(c).label + " anything", Theme.Type.TITLE_S);
+        hello.setTextSize(16f);
+        hello.setPadding(dp(4), dp(2), 0, 0);
+        chatPage.addView(hello, Theme.lp(Theme.MATCH, Theme.WRAP));
+
+        // quick starts
+        android.widget.HorizontalScrollView sugScroll = new android.widget.HorizontalScrollView(c);
+        sugScroll.setHorizontalScrollBarEnabled(false);
+        sugScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        LinearLayout sug = new LinearLayout(c);
+        sug.setOrientation(LinearLayout.HORIZONTAL);
+        sug.addView(pill(R.drawable.ic_scan, "Explain my screen", true, () -> {
+            if (composer != null && composer.text().trim().isEmpty()) composer.setText("Explain what's on my screen");
+            actions.attachScreen();
+        }));
+        sug.addView(pill(R.drawable.ic_sparkles, "Summarize", false, () -> startTyping("Summarize this: ")));
+        sug.addView(pill(R.drawable.ic_globe, "Translate", false, () -> startTyping("Translate this to English: ")));
+        sug.addView(pill(R.drawable.ic_edit, "Write a reply", false, () -> startTyping("Help me write a reply to: ")));
+        sugScroll.addView(sug);
+        chatPage.addView(sugScroll, Theme.lp(Theme.MATCH, Theme.WRAP, dp(10)));
+
+        // recent chats, side-scrolling
         List<Chats.Chat> recent = Chats.list(c);
         if (!recent.isEmpty()) {
-            LinearLayout head = new LinearLayout(c);
-            head.setOrientation(LinearLayout.HORIZONTAL);
-            head.setGravity(Gravity.CENTER_VERTICAL);
-            head.setPadding(dp(6), 0, dp(2), 0);
-            head.addView(Theme.text(c, "Recent chats", Theme.Type.OVERLINE), new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
-            TextView all = Theme.text(c, "Open chat", Theme.Type.LABEL);
-            all.setTextColor(Theme.TEXT);
-            all.setPadding(dp(8), dp(4), dp(4), dp(4));
-            all.setOnClickListener(v -> {
-                Theme.tap(v);
-                actions.chat(recent.get(0).id, false);
-            });
-            head.addView(all);
-            chatPage.addView(head, Theme.lp(Theme.MATCH, Theme.WRAP));
-            for (int i = 0; i < Math.min(2, recent.size()); i++) {
+            TextView label = Theme.text(c, "Recent", Theme.Type.OVERLINE);
+            label.setPadding(dp(4), 0, 0, 0);
+            chatPage.addView(label, Theme.lp(Theme.MATCH, Theme.WRAP, dp(12)));
+            android.widget.HorizontalScrollView recScroll = new android.widget.HorizontalScrollView(c);
+            recScroll.setHorizontalScrollBarEnabled(false);
+            recScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+            LinearLayout rec = new LinearLayout(c);
+            rec.setOrientation(LinearLayout.HORIZONTAL);
+            for (int i = 0; i < Math.min(6, recent.size()); i++) {
                 Chats.Chat ch = recent.get(i);
-                chatPage.addView(chatRow(ch, () -> actions.chat(ch.id, false)), Theme.lp(Theme.MATCH, Theme.WRAP, dp(i == 0 ? 6 : 4)));
+                rec.addView(recentCard(ch, () -> actions.chat(ch.id, false)));
             }
-        } else {
-            TextView sub = Theme.text(c, "Ask " + Prefs.provider(c).label + " anything. Chats save themselves.", Theme.Type.CAPTION);
-            sub.setPadding(dp(6), 0, dp(6), 0);
-            chatPage.addView(sub, Theme.lp(Theme.MATCH, Theme.WRAP));
+            recScroll.addView(rec);
+            chatPage.addView(recScroll, Theme.lp(Theme.MATCH, Theme.WRAP, dp(6)));
         }
 
         // inline attach options
@@ -269,13 +283,15 @@ final class MenuPopover {
         params = new WindowManager.LayoutParams(
                 panelW + shadowPad * 2, ViewGroup.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                         | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                         | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.START;
+        params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
+                | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING;
         int gap = dp(12);
         int panelX = orbOnLeft ? orb.right + gap : orb.left - gap - panelW;
         int panelY = orb.centerY() - panelH / 2;
@@ -313,25 +329,79 @@ final class MenuPopover {
         }
     }
 
-    /** Let the window take keyboard focus and move it up so the keyboard doesn't cover it. */
+    /** Typing started: lift the menu to the top so the keyboard doesn't cover it, open the keyboard. */
     private void makeFocusable() {
-        if (root == null || focusable) return;
-        focusable = true;
-        params.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        params.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
-        params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
-                | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING;
-        params.y = safe.top + dp(4) - dp(28);
-        try {
-            wm.updateViewLayout(root, params);
-        } catch (Exception ignored) {
+        if (root == null || composer == null) return;
+        if (!focusable) {
+            focusable = true;
+            params.y = safe.top + dp(4) - dp(28);
+            try {
+                wm.updateViewLayout(root, params);
+            } catch (Exception ignored) {
+            }
         }
         root.post(() -> {
             if (composer == null) return;
             composer.input().requestFocus();
             InputMethodManager imm = c.getSystemService(InputMethodManager.class);
-            if (imm != null) imm.showSoftInput(composer.input(), 0);
+            if (imm != null) imm.showSoftInput(composer.input(), InputMethodManager.SHOW_IMPLICIT);
         });
+    }
+
+    private void startTyping(String text) {
+        if (composer == null) return;
+        composer.setText(text);
+        makeFocusable();
+    }
+
+    private View pill(int icon, String label, boolean strong, Runnable action) {
+        LinearLayout p = new LinearLayout(c);
+        p.setOrientation(LinearLayout.HORIZONTAL);
+        p.setGravity(Gravity.CENTER_VERTICAL);
+        p.setPadding(dp(11), dp(7), dp(13), dp(7));
+        int fg = strong ? Theme.BLACK : Theme.TEXT;
+        p.setBackground(strong ? Theme.accentFill(dp(16))
+                : Theme.ripple(Theme.rounded(Theme.FILL, dp(16), Theme.HAIRLINE, Math.max(1, dp(0.8f))), dp(16)));
+        p.addView(Theme.icon(c, icon, fg, 14), new LinearLayout.LayoutParams(dp(14), dp(14)));
+        TextView t = Theme.text(c, label, Theme.Type.LABEL);
+        t.setTextColor(fg);
+        t.setTypeface(Fonts.weight(c, 600));
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(Theme.WRAP, Theme.WRAP);
+        tp.leftMargin = dp(6);
+        p.addView(t, tp);
+        p.setClickable(true);
+        p.setOnClickListener(v -> {
+            Theme.tap(v);
+            action.run();
+        });
+        Theme.pressable(p, 0.93f);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.WRAP, dp(32));
+        lp.rightMargin = dp(6);
+        p.setLayoutParams(lp);
+        return p;
+    }
+
+    private View recentCard(Chats.Chat ch, Runnable action) {
+        LinearLayout card = new LinearLayout(c);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(12), dp(9), dp(12), dp(9));
+        card.setBackground(Theme.ripple(Theme.rounded(Theme.FILL, dp(16), Theme.HAIRLINE, Math.max(1, dp(0.8f))), dp(16)));
+        TextView title = Theme.oneLine(Theme.text(c, ch.title.isEmpty() ? "Chat" : ch.title, Theme.Type.CALLOUT));
+        title.setMaxWidth(dp(150));
+        card.addView(title);
+        TextView sub = Theme.oneLine(Theme.text(c, History.relative(ch.updated), Theme.Type.LABEL));
+        sub.setTextColor(Theme.TEXT_3);
+        card.addView(sub, Theme.lp(Theme.WRAP, Theme.WRAP, dp(3)));
+        card.setClickable(true);
+        card.setOnClickListener(v -> {
+            Theme.tap(v);
+            action.run();
+        });
+        Theme.pressable(card, 0.95f);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(164), Theme.WRAP);
+        lp.rightMargin = dp(6);
+        card.setLayoutParams(lp);
+        return card;
     }
 
     /** After the content grows, nudge the window up so it stays on screen. */
@@ -388,10 +458,10 @@ final class MenuPopover {
         hero.setPadding(dp(10), dp(8), dp(12), dp(8));
         hero.setBackground(new android.graphics.drawable.RippleDrawable(
                 android.content.res.ColorStateList.valueOf(0x1F000000),
-                Theme.rounded(Theme.WHITE, dp(20)), Theme.rounded(Theme.WHITE, dp(20))));
+                Theme.accentFill(dp(20)), Theme.rounded(Theme.ACCENT, dp(20))));
         FrameLayout disc = new FrameLayout(c);
         disc.setBackground(Theme.rounded(Theme.BLACK, dp(18)));
-        disc.addView(Theme.icon(c, icon, Theme.WHITE, 18));
+        disc.addView(Theme.icon(c, icon, Theme.ACCENT, 18));
         LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(36), dp(36));
         dlp.rightMargin = dp(10);
         hero.addView(disc, dlp);
@@ -450,7 +520,7 @@ final class MenuPopover {
         chip.setPadding(dp(8), dp(4), dp(9), dp(4));
         chip.setBackground(Theme.rounded(Theme.FILL, dp(12)));
         View dot = new View(c);
-        dot.setBackground(Theme.rounded(busy ? Theme.WHITE : 0xB3FFFFFF, dp(3)));
+        dot.setBackground(Theme.rounded(busy ? Theme.ACCENT : 0xB3FFFFFF, dp(3)));
         LinearLayout.LayoutParams dp6 = new LinearLayout.LayoutParams(dp(6), dp(6));
         dp6.rightMargin = dp(6);
         chip.addView(dot, dp6);

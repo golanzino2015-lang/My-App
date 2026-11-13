@@ -107,6 +107,21 @@ final class PagerFrame extends FrameLayout {
         if (changed && listener != null) listener.onPage(i);
     }
 
+    /** True if a view under (x, y) can still scroll sideways in that direction (e.g. a chip row). */
+    private static boolean childScrolls(android.view.ViewGroup parent, float x, float y, int dir) {
+        for (int i = parent.getChildCount() - 1; i >= 0; i--) {
+            View ch = parent.getChildAt(i);
+            if (ch.getVisibility() != VISIBLE) continue;
+            if (x < ch.getLeft() || x >= ch.getRight() || y < ch.getTop() || y >= ch.getBottom()) continue;
+            if (ch.canScrollHorizontally(dir)) return true;
+            if (ch instanceof android.view.ViewGroup) {
+                float cx = x - ch.getLeft() + ch.getScrollX(), cy = y - ch.getTop() + ch.getScrollY();
+                if (childScrolls((android.view.ViewGroup) ch, cx, cy, dir)) return true;
+            }
+        }
+        return false;
+    }
+
     private void track(MotionEvent e) {
         if (vt == null) vt = VelocityTracker.obtain();
         vt.addMovement(e);
@@ -126,7 +141,8 @@ final class PagerFrame extends FrameLayout {
             case MotionEvent.ACTION_MOVE:
                 track(e);
                 float dx = e.getRawX() - downX, dy = e.getRawY() - downY;
-                if (!dragging && Math.abs(dx) > slop && Math.abs(dx) > Math.abs(dy) * 1.2f) {
+                if (!dragging && Math.abs(dx) > slop && Math.abs(dx) > Math.abs(dy) * 1.2f
+                        && !childScrolls(this, e.getX() + getScrollX(), e.getY(), dx > 0 ? -1 : 1)) {
                     dragging = true;
                     if (anim != null) anim.cancel();
                     if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);

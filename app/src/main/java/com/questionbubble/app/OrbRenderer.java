@@ -50,7 +50,7 @@ final class OrbRenderer {
                 new int[]{0x00FFFFFF, 0x00FFFFFF, 0x45FFFFFF, 0x00FFFFFF},
                 new float[]{0f, 0.69f, 0.73f, 1f}, C));
         body.setShader(new RadialGradient(-0.34f * r, -0.46f * r, 1.7f * r,
-                new int[]{0xFF6E6E6E, 0xFF2E2E2E, 0xFF0E0E0E, 0xFF030303},
+                Theme.ORB,
                 new float[]{0f, 0.34f, 0.74f, 1f}, C));
 
         Shader sweep = new SweepGradient(0, 0,

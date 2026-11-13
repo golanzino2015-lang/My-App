@@ -390,6 +390,27 @@ public class MainActivity extends Activity {
         Rows.add(ai, styleWrap);
         add(ai, 10, step++);
 
+        add(Rows.section(this, "Appearance"), 30, step++);
+        LinearLayout look = Rows.group(this);
+        Palette pal = Palette.get(Prefs.theme(this));
+        LinearLayout themeValue = new LinearLayout(this);
+        themeValue.setOrientation(LinearLayout.HORIZONTAL);
+        themeValue.setGravity(Gravity.CENTER_VERTICAL);
+        View sw = new View(this);
+        android.graphics.drawable.GradientDrawable sg = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR, new int[]{pal.light, pal.base, pal.dark});
+        sg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        sw.setBackground(sg);
+        LinearLayout.LayoutParams swp = new LinearLayout.LayoutParams(dp(18), dp(18));
+        swp.rightMargin = dp(8);
+        themeValue.addView(sw, swp);
+        themeValue.addView(Rows.value(this, pal.name));
+        Rows.add(look, Rows.row(this, R.drawable.ic_sparkles, "Theme color", null, themeValue,
+                () -> Sheets.themePicker(this, () -> {
+                    recreate();
+                })));
+        add(look, 10, step++);
+
         add(Rows.section(this, "Bubble"), 30, step++);
         LinearLayout bub = Rows.group(this);
         SegmentedView size = new SegmentedView(this, new String[]{"S", "M", "L"}, Prefs.bubbleSize(this));

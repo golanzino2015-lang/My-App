@@ -100,6 +100,15 @@ final class Prefs {
         sp(c).edit().putBoolean("chat_search", on).apply();
     }
 
+    /** Color theme id (see Palette). */
+    static String theme(Context c) {
+        return sp(c).getString("theme", "classic");
+    }
+
+    static void setTheme(Context c, String id) {
+        sp(c).edit().putString("theme", id).apply();
+    }
+
     static boolean haptics(Context c) {
         return sp(c).getBoolean(K_HAPTICS, true);
     }

@@ -69,7 +69,7 @@ final class ModelList {
         View trailing = null;
         if (on) {
             FrameLayout f = new FrameLayout(c);
-            f.setBackground(Theme.rounded(Theme.WHITE, Theme.dp(c, 11)));
+            f.setBackground(Theme.rounded(Theme.ACCENT, Theme.dp(c, 11)));
             f.addView(Theme.icon(c, R.drawable.ic_check, Theme.BLACK, 14));
             f.setLayoutParams(new LinearLayout.LayoutParams(Theme.dp(c, 22), Theme.dp(c, 22)));
             trailing = f;

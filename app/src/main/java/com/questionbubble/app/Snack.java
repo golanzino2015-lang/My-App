@@ -27,7 +27,7 @@ final class Snack {
         pill.setBackground(Theme.rounded(Theme.SURFACE_3, Theme.dp(a, 24), Theme.HAIRLINE_STRONG, Math.max(1, Theme.dp(a, 0.8f))));
         if (iconRes != 0) {
             FrameLayout disc = new FrameLayout(a);
-            disc.setBackground(Theme.rounded(Theme.WHITE, Theme.dp(a, 11)));
+            disc.setBackground(Theme.rounded(Theme.ACCENT, Theme.dp(a, 11)));
             disc.addView(Theme.icon(a, iconRes, Theme.BLACK, 13));
             LinearLayout.LayoutParams dp = new LinearLayout.LayoutParams(Theme.dp(a, 22), Theme.dp(a, 22));
             dp.rightMargin = Theme.dp(a, 10);

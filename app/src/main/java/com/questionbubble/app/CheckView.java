@@ -20,7 +20,7 @@ final class CheckView extends View {
 
     CheckView(Context c) {
         super(c);
-        disc.setColor(Theme.WHITE);
+        disc.setColor(Theme.ACCENT);
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeCap(Paint.Cap.ROUND);
         stroke.setStrokeJoin(Paint.Join.ROUND);

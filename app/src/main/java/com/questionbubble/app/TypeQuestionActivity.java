@@ -132,7 +132,7 @@ public class TypeQuestionActivity extends Activity {
         input.setMinHeight(dp(52));
         input.setPadding(dp(18), dp(14), dp(60), dp(14));
         GradientDrawable cursor = new GradientDrawable();
-        cursor.setColor(Theme.WHITE);
+        cursor.setColor(Theme.ACCENT);
         cursor.setSize(dp(2), dp(20));
         input.setTextCursorDrawable(cursor);
         input.setOnFocusChangeListener((v, has) -> fbg.setStroke(Math.max(1, dp(1)), has ? 0x66FFFFFF : Theme.HAIRLINE_STRONG));
@@ -191,7 +191,7 @@ public class TypeQuestionActivity extends Activity {
     private void setSendEnabled(boolean on) {
         if (sendEnabled == on) return;
         sendEnabled = on;
-        send.setBackground(Theme.rounded(on ? Theme.WHITE : Theme.FILL, dp(20)));
+        send.setBackground(Theme.rounded(on ? Theme.ACCENT : Theme.FILL, dp(20)));
         sendIcon.setImageTintList(ColorStateList.valueOf(on ? Theme.BLACK : Theme.TEXT_3));
         send.setScaleX(0.8f);
         send.setScaleY(0.8f);
@@ -269,7 +269,7 @@ public class TypeQuestionActivity extends Activity {
         copied.setOrientation(LinearLayout.HORIZONTAL);
         copied.setGravity(Gravity.CENTER_VERTICAL);
         copied.setPadding(dp(8), dp(6), dp(12), dp(6));
-        copied.setBackground(Theme.rounded(Theme.WHITE, dp(16)));
+        copied.setBackground(Theme.rounded(Theme.ACCENT, dp(16)));
         copied.addView(Theme.icon(this, R.drawable.ic_check, Theme.BLACK, 14), new LinearLayout.LayoutParams(dp(16), dp(16)));
         TextView t = Theme.text(this, "Copied", Theme.Type.LABEL);
         t.setTextColor(Theme.BLACK);

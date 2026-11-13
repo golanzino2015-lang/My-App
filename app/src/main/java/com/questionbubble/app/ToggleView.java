@@ -108,7 +108,7 @@ final class ToggleView extends View {
     protected void onDraw(Canvas canvas) {
         float w = getWidth(), h = getHeight(), r = h / 2f;
         float p = Math.max(0f, Math.min(1f, progress));
-        track.setColor(blend(0xFF2A2A2A, Theme.WHITE, p));
+        track.setColor(blend(0xFF2A2A2A, Theme.ACCENT, p));
         rect.set(0, 0, w, h);
         canvas.drawRoundRect(rect, r, r, track);
         if (p < 0.5f) {

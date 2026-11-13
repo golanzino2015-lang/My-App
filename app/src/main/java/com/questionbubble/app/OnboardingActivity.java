@@ -418,7 +418,7 @@ public class OnboardingActivity extends Activity {
         PageDots(Context c, int count) {
             super(c);
             this.count = count;
-            on.setColor(Theme.WHITE);
+            on.setColor(Theme.ACCENT);
             off.setColor(0x38FFFFFF);
         }
 

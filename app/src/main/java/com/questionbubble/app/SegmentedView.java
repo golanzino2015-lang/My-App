@@ -34,7 +34,7 @@ final class SegmentedView extends View {
         this.selected = selected;
         this.pos = selected;
         track.setColor(Theme.FILL);
-        thumb.setColor(Theme.WHITE);
+        thumb.setColor(Theme.ACCENT);
         thumb.setShadowLayer(Theme.dp(c, 3), 0, Theme.dp(c, 1), 0x66000000);
         setLayerType(LAYER_TYPE_SOFTWARE, null);
         float sp = c.getResources().getDisplayMetrics().scaledDensity;

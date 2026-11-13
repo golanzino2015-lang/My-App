@@ -41,10 +41,10 @@ final class KeyField extends LinearLayout {
         input.setImeOptions(EditorInfo.IME_ACTION_DONE);
         input.setPadding(Theme.dp(c, 18), Theme.dp(c, 18), Theme.dp(c, 96), Theme.dp(c, 18));
         GradientDrawable cursor = new GradientDrawable();
-        cursor.setColor(Theme.WHITE);
+        cursor.setColor(Theme.ACCENT);
         cursor.setSize(Theme.dp(c, 2), Theme.dp(c, 20));
         input.setTextCursorDrawable(cursor);
-        input.setOnFocusChangeListener((v, has) -> bg.setStroke(Math.max(1, Theme.dp(c, 1)), has ? Theme.WHITE : Theme.HAIRLINE_STRONG));
+        input.setOnFocusChangeListener((v, has) -> bg.setStroke(Math.max(1, Theme.dp(c, 1)), has ? Theme.ACCENT : Theme.HAIRLINE_STRONG));
         box.addView(input, new FrameLayout.LayoutParams(Theme.MATCH, Theme.WRAP));
 
         TextView paste = Theme.text(c, "Paste", Theme.Type.LABEL);
@@ -52,7 +52,7 @@ final class KeyField extends LinearLayout {
         paste.setTypeface(Fonts.weight(c, 600));
         paste.setGravity(Gravity.CENTER);
         paste.setPadding(Theme.dp(c, 14), 0, Theme.dp(c, 14), 0);
-        paste.setBackground(Theme.rounded(Theme.WHITE, Theme.dp(c, 15)));
+        paste.setBackground(Theme.rounded(Theme.ACCENT, Theme.dp(c, 15)));
         paste.setClickable(true);
         paste.setOnClickListener(v -> {
             Theme.tap(v);
@@ -109,12 +109,12 @@ final class KeyField extends LinearLayout {
         status.setText(msg);
         status.setTextColor(Theme.TEXT);
         showStatus();
-        bg.setStroke(Math.max(1, Theme.dp(getContext(), 1)), Theme.WHITE);
+        bg.setStroke(Math.max(1, Theme.dp(getContext(), 1)), Theme.ACCENT);
     }
 
     void clearStatus() {
         status.setVisibility(GONE);
-        bg.setStroke(Math.max(1, Theme.dp(getContext(), 1)), input.hasFocus() ? Theme.WHITE : Theme.HAIRLINE_STRONG);
+        bg.setStroke(Math.max(1, Theme.dp(getContext(), 1)), input.hasFocus() ? Theme.ACCENT : Theme.HAIRLINE_STRONG);
     }
 
     private void showStatus() {

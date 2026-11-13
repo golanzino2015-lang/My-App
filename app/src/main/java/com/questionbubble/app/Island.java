@@ -52,11 +52,11 @@ final class Island {
             } else {
                 iconBox.setBackground(Theme.rounded(0x1FFFFFFF, Theme.dp(c, 18)));
                 if (kind == Kind.LOADING) {
-                    iconBox.addView(new Spinner(c, Theme.WHITE),
+                    iconBox.addView(new Spinner(c, Theme.ACCENT),
                             new FrameLayout.LayoutParams(Theme.dp(c, 18), Theme.dp(c, 18), Gravity.CENTER));
                 } else {
                     iconBox.addView(Theme.icon(c, kind == Kind.ERROR ? R.drawable.ic_alert : R.drawable.ic_sparkles,
-                            Theme.WHITE, 18));
+                            Theme.ACCENT, 18));
                 }
             }
             title.setText(t);

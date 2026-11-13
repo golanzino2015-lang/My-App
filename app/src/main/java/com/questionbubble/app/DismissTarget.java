@@ -86,7 +86,7 @@ final class DismissTarget {
         active = on;
         circle.animate().scaleX(on ? 1.28f : 1f).scaleY(on ? 1.28f : 1f).setDuration(320)
                 .setInterpolator(new android.view.animation.OvershootInterpolator(2f)).start();
-        circleBg.setColor(on ? Theme.WHITE : 0xCC1A1A1A);
+        circleBg.setColor(on ? Theme.ACCENT : 0xCC1A1A1A);
         icon.setImageTintList(android.content.res.ColorStateList.valueOf(on ? Theme.BLACK : Theme.TEXT));
     }
 

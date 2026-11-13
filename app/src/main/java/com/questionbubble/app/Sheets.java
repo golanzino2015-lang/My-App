@@ -20,6 +20,64 @@ import java.util.concurrent.Executors;
 /** The app's bottom sheets. */
 final class Sheets {
 
+    /** Grid of color themes. Picking one re-colors the app and the bubble. */
+    static void themePicker(Activity a, Runnable onChanged) {
+        Sheet s = new Sheet(a);
+        s.title("Theme color", "Changes buttons, switches, the bubble and the orb.");
+        String current = Prefs.theme(a);
+        LinearLayout grid = new LinearLayout(a);
+        grid.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout row = null;
+        for (int i = 0; i < Palette.ALL.length; i++) {
+            if (i % 4 == 0) {
+                row = new LinearLayout(a);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                grid.addView(row, Theme.lp(Theme.MATCH, Theme.WRAP, i == 0 ? 0 : Theme.dp(a, 14)));
+            }
+            Palette p = Palette.ALL[i];
+            row.addView(swatch(a, p, p.id.equals(current), () -> {
+                if (!p.id.equals(Prefs.theme(a))) {
+                    Prefs.setTheme(a, p.id);
+                    Theme.apply(a);
+                }
+                s.close();
+                if (onChanged != null) onChanged.run();
+            }), new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
+        }
+        s.add(grid, 20);
+        s.show();
+    }
+
+    private static View swatch(Activity a, Palette p, boolean selected, Runnable onPick) {
+        LinearLayout col = new LinearLayout(a);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER_HORIZONTAL);
+        FrameLayout ring = new FrameLayout(a);
+        int size = Theme.dp(a, 56);
+        if (selected) ring.setBackground(Theme.rounded(0x00000000, size / 2f, Theme.TEXT, Theme.dp(a, 2)));
+        View disc = new View(a);
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR, new int[]{p.light, p.base, p.dark});
+        g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        g.setStroke(Math.max(1, Theme.dp(a, 1)), 0x33FFFFFF);
+        disc.setBackground(g);
+        FrameLayout.LayoutParams dp = new FrameLayout.LayoutParams(Theme.dp(a, 44), Theme.dp(a, 44), Gravity.CENTER);
+        ring.addView(disc, dp);
+        if (selected) ring.addView(Theme.icon(a, R.drawable.ic_check, Theme.BLACK, 20));
+        col.addView(ring, new LinearLayout.LayoutParams(size, size));
+        TextView name = Theme.oneLine(Theme.text(a, p.name, Theme.Type.LABEL));
+        name.setGravity(Gravity.CENTER);
+        name.setTextColor(selected ? Theme.TEXT : Theme.TEXT_2);
+        col.addView(name, Theme.lp(Theme.MATCH, Theme.WRAP, Theme.dp(a, 6)));
+        col.setClickable(true);
+        col.setOnClickListener(v -> {
+            Theme.tick(v);
+            onPick.run();
+        });
+        Theme.pressable(col, 0.92f);
+        return col;
+    }
+
     /** Claude-style model menu: every model grouped by AI, plus Think / Search switches. */
     static void modelPicker(Activity a, Runnable onChanged) {
         Sheet s = new Sheet(a);
@@ -187,7 +245,7 @@ final class Sheets {
 
     private static View radio(Activity a, boolean on) {
         FrameLayout f = new FrameLayout(a);
-        f.setBackground(on ? Theme.rounded(Theme.WHITE, Theme.dp(a, 11))
+        f.setBackground(on ? Theme.rounded(Theme.ACCENT, Theme.dp(a, 11))
                 : Theme.rounded(0x00000000, Theme.dp(a, 11), Theme.TEXT_3, Theme.dp(a, 1.5f)));
         if (on) f.addView(Theme.icon(a, R.drawable.ic_check, Theme.BLACK, 14));
         f.setLayoutParams(new LinearLayout.LayoutParams(Theme.dp(a, 22), Theme.dp(a, 22)));
@@ -248,7 +306,7 @@ final class Sheets {
         num.setGravity(Gravity.CENTER);
         num.setTextColor(Theme.BLACK);
         num.setTypeface(Fonts.weight(a, 700));
-        num.setBackground(Theme.rounded(Theme.WHITE, Theme.dp(a, 12)));
+        num.setBackground(Theme.rounded(Theme.ACCENT, Theme.dp(a, 12)));
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(Theme.dp(a, 24), Theme.dp(a, 24));
         np.rightMargin = Theme.dp(a, 14);
         row.addView(num, np);

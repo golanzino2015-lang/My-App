@@ -79,7 +79,7 @@ final class Composer extends LinearLayout {
         input.setImeOptions(EditorInfo.IME_ACTION_SEND);
         input.setPadding(dp(10), dp(8), dp(10), dp(6));
         GradientDrawable cursor = new GradientDrawable();
-        cursor.setColor(Theme.WHITE);
+        cursor.setColor(Theme.ACCENT);
         cursor.setSize(dp(2), dp(20));
         input.setTextCursorDrawable(cursor);
         input.setOnEditorActionListener((v, action, ev) -> {
@@ -192,7 +192,7 @@ final class Composer extends LinearLayout {
     }
 
     private void styleToggle(FrameLayout b, ImageView icon, boolean on) {
-        b.setBackground(on ? Theme.rounded(Theme.WHITE, dp(17))
+        b.setBackground(on ? Theme.rounded(Theme.ACCENT, dp(17))
                 : Theme.rounded(0x00000000, dp(17), Theme.HAIRLINE_STRONG, Math.max(1, dp(1))));
         icon.setImageTintList(ColorStateList.valueOf(on ? Theme.BLACK : Theme.TEXT_2));
     }
@@ -279,7 +279,7 @@ final class Composer extends LinearLayout {
         boolean on = !busy && (input.getText().toString().trim().length() > 0 || !images.isEmpty());
         if (on == sendOn) return;
         sendOn = on;
-        send.setBackground(Theme.rounded(on ? Theme.WHITE : Theme.FILL, dp(18)));
+        send.setBackground(on ? Theme.accentFill(dp(18)) : Theme.rounded(Theme.FILL, dp(18)));
         sendIcon.setImageTintList(ColorStateList.valueOf(on ? Theme.BLACK : Theme.TEXT_3));
         send.setScaleX(0.8f);
         send.setScaleY(0.8f);
@@ -300,7 +300,7 @@ final class Composer extends LinearLayout {
             Theme.elevate(f, 0, 14);
             FrameLayout x = new FrameLayout(getContext());
             x.setBackground(Theme.rounded(0xE6000000, dp(10)));
-            x.addView(Theme.icon(getContext(), R.drawable.ic_x, Theme.WHITE, 11));
+            x.addView(Theme.icon(getContext(), R.drawable.ic_x, Theme.ACCENT, 11));
             x.setOnClickListener(v -> {
                 Theme.tick(v);
                 images.remove(name);

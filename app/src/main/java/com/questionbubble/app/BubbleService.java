@@ -80,6 +80,13 @@ public class BubbleService extends AccessibilityService {
                 menu.dismissNow();
                 bubble.remove();
             }
+        } else if ("theme".equals(key)) {
+            Theme.apply(this);
+            menu.dismissNow();
+            if (bubble.isShowing()) {
+                bubble.removeNow();
+                showBubble();
+            }
         } else if (Prefs.K_BUBBLE_SIZE.equals(key)) {
             if (bubble.isShowing()) {
                 menu.dismissNow();

@@ -34,11 +34,11 @@ final class PillButton extends FrameLayout {
         int fg = kind == Kind.PRIMARY ? Theme.BLACK : (kind == Kind.GHOST ? Theme.TEXT_2 : Theme.TEXT);
 
         android.graphics.drawable.GradientDrawable bg;
-        if (kind == Kind.PRIMARY) bg = Theme.rounded(Theme.WHITE, h / 2f);
+        if (kind == Kind.PRIMARY) bg = Theme.accentFill(h / 2f);
         else if (kind == Kind.SECONDARY) bg = Theme.rounded(Theme.FILL, h / 2f, Theme.HAIRLINE, Math.max(1, Theme.dp(c, 0.8f)));
         else bg = Theme.rounded(0x00000000, h / 2f);
         setBackground(new RippleDrawable(ColorStateList.valueOf(kind == Kind.PRIMARY ? 0x1F000000 : 0x1AFFFFFF),
-                bg, Theme.rounded(Theme.WHITE, h / 2f)));
+                bg, Theme.rounded(Theme.ACCENT, h / 2f)));
 
         content = new LinearLayout(c);
         content.setOrientation(LinearLayout.HORIZONTAL);

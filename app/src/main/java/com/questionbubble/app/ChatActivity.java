@@ -58,6 +58,8 @@ public class ChatActivity extends Activity {
     private boolean busy;
     private long requestStart;
     private FrameLayout drawer;
+    private FrameLayout jump;
+    private boolean jumpShown;
     private View drawerScrim;
     private LinearLayout drawerList;
     private boolean drawerOpen;
@@ -82,15 +84,44 @@ public class ChatActivity extends Activity {
 
         content.addView(topBar(), Theme.lp(Theme.MATCH, Theme.WRAP));
 
+        FrameLayout stage = new FrameLayout(this);
         scroll = new ScrollView(this);
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         scroll.setFillViewport(true);
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
-        list.setPadding(dp(20), dp(8), dp(20), dp(20));
+        list.setPadding(dp(18), dp(10), dp(18), dp(28));
         scroll.addView(list);
-        content.addView(scroll, new LinearLayout.LayoutParams(Theme.MATCH, 0, 1));
+        stage.addView(scroll, new FrameLayout.LayoutParams(Theme.MATCH, Theme.MATCH));
+
+        // soft fades so messages slide under the bars
+        View topFade = new View(this);
+        topFade.setBackground(new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Theme.BG, 0x00000000}));
+        stage.addView(topFade, new FrameLayout.LayoutParams(Theme.MATCH, dp(18), Gravity.TOP));
+        View bottomFade = new View(this);
+        bottomFade.setBackground(new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.BOTTOM_TOP, new int[]{Theme.BG, 0x00000000}));
+        stage.addView(bottomFade, new FrameLayout.LayoutParams(Theme.MATCH, dp(28), Gravity.BOTTOM));
+
+        // jump to the latest message
+        jump = new FrameLayout(this);
+        jump.setBackground(Theme.rounded(Theme.SURFACE_3, dp(20), Theme.HAIRLINE_STRONG, Math.max(1, dp(1))));
+        jump.addView(Theme.icon(this, R.drawable.ic_chevron_down, Theme.TEXT, 20));
+        Theme.elevate(jump, 8, 20);
+        jump.setClickable(true);
+        jump.setOnClickListener(v -> {
+            Theme.tap(v);
+            scrollToEnd(true);
+        });
+        FrameLayout.LayoutParams jp = new FrameLayout.LayoutParams(dp(40), dp(40), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        jp.bottomMargin = dp(10);
+        stage.addView(jump, jp);
+        jump.setAlpha(0f);
+        jump.setVisibility(View.GONE);
+        scroll.setOnScrollChangeListener((v, x, y, ox, oy) -> updateJump());
+        content.addView(stage, new LinearLayout.LayoutParams(Theme.MATCH, 0, 1));
 
         composer = new Composer(this, new Composer.Host() {
             @Override
@@ -112,10 +143,11 @@ public class ChatActivity extends Activity {
             }
         });
         LinearLayout.LayoutParams cp = Theme.lp(Theme.MATCH, Theme.WRAP);
-        cp.leftMargin = dp(12);
-        cp.rightMargin = dp(12);
-        cp.bottomMargin = dp(10);
+        cp.leftMargin = dp(10);
+        cp.rightMargin = dp(10);
+        cp.bottomMargin = dp(8);
         content.addView(composer, cp);
+        Theme.elevate(composer, 14, 28);
 
         buildDrawer(root);
         setContentView(root);
@@ -202,20 +234,19 @@ public class ChatActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(12), dp(8), dp(12), dp(8));
-        row.addView(Rows.iconButton(this, R.drawable.ic_menu, this::openDrawer));
+        row.setPadding(dp(8), dp(6), dp(8), dp(6));
+        row.addView(barButton(R.drawable.ic_menu, this::openDrawer));
 
-        LinearLayout titles = new LinearLayout(this);
-        titles.setOrientation(LinearLayout.VERTICAL);
-        titles.setGravity(Gravity.CENTER_HORIZONTAL);
-        titleView = Theme.oneLine(Theme.text(this, "New chat", Theme.Type.TITLE_S));
-        titleView.setGravity(Gravity.CENTER);
-        titles.addView(titleView, Theme.lp(Theme.MATCH, Theme.WRAP));
-        modelView = Theme.oneLine(Theme.text(this, "", Theme.Type.LABEL));
-        modelView.setGravity(Gravity.CENTER);
-        modelView.setCompoundDrawablePadding(dp(2));
-        modelView.setPadding(dp(10), dp(4), dp(8), dp(4));
-        modelView.setBackground(Theme.ripple(Theme.rounded(0x00000000, dp(12)), dp(12)));
+        LinearLayout center = new LinearLayout(this);
+        center.setOrientation(LinearLayout.VERTICAL);
+        center.setGravity(Gravity.CENTER_HORIZONTAL);
+        modelView = Theme.oneLine(Theme.text(this, "", Theme.Type.CALLOUT));
+        modelView.setTypeface(Fonts.weight(this, 600));
+        modelView.setGravity(Gravity.CENTER_VERTICAL);
+        modelView.setCompoundDrawablePadding(dp(6));
+        modelView.setPadding(dp(12), 0, dp(10), 0);
+        modelView.setMinHeight(dp(36));
+        modelView.setBackground(Theme.ripple(Theme.rounded(Theme.FILL, dp(18), Theme.HAIRLINE, Math.max(1, dp(0.8f))), dp(18)));
         modelView.setOnClickListener(v -> {
             Theme.tap(v);
             Sheets.modelPicker(this, () -> {
@@ -223,28 +254,68 @@ public class ChatActivity extends Activity {
                 updateHeader();
             });
         });
-        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(Theme.WRAP, Theme.WRAP);
-        mp.gravity = Gravity.CENTER_HORIZONTAL;
-        mp.topMargin = dp(1);
-        titles.addView(modelView, mp);
-        titles.setPadding(dp(8), 0, dp(8), 0);
-        row.addView(titles, new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
+        Theme.pressable(modelView, 0.95f);
+        center.addView(modelView, new LinearLayout.LayoutParams(Theme.WRAP, dp(36)));
+        titleView = Theme.oneLine(Theme.text(this, "", Theme.Type.LABEL));
+        titleView.setTextColor(Theme.TEXT_3);
+        titleView.setGravity(Gravity.CENTER);
+        titleView.setMaxWidth(dp(220));
+        center.addView(titleView, Theme.lp(Theme.WRAP, Theme.WRAP, dp(3)));
+        row.addView(center, new LinearLayout.LayoutParams(0, Theme.WRAP, 1));
 
-        row.addView(Rows.iconButton(this, R.drawable.ic_edit, this::newChat));
+        row.addView(barButton(R.drawable.ic_edit, this::newChat));
         return row;
     }
 
+    private View barButton(int icon, Runnable action) {
+        FrameLayout b = new FrameLayout(this);
+        b.setBackground(Theme.ripple(Theme.rounded(0x00000000, dp(22)), dp(22)));
+        b.addView(Theme.icon(this, icon, Theme.TEXT, 22));
+        b.setClickable(true);
+        b.setOnClickListener(v -> {
+            Theme.tap(v);
+            action.run();
+        });
+        Theme.pressable(b, 0.88f);
+        b.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
+        return b;
+    }
+
     private void updateHeader() {
-        titleView.setText(chat == null || chat.title.isEmpty() ? "New chat" : chat.title);
-        modelView.setText(Prefs.provider(this).label + " · " + Provider.modelLabel(Prefs.model(this)));
+        boolean hasTitle = chat != null && !chat.title.isEmpty();
+        titleView.setText(hasTitle ? chat.title : "");
+        titleView.setVisibility(hasTitle ? View.VISIBLE : View.GONE);
+        modelView.setText(Provider.modelLabel(Prefs.model(this)));
+        android.graphics.drawable.GradientDrawable dot = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{Theme.ACCENT_LIGHT, Theme.ACCENT, Theme.ACCENT_DARK});
+        dot.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        dot.setBounds(0, 0, dp(10), dp(10));
         android.graphics.drawable.Drawable d = getDrawable(R.drawable.ic_chevron_down);
         if (d != null) {
             d = d.mutate();
             d.setTint(Theme.TEXT_2);
-            d.setBounds(0, 0, dp(14), dp(14));
-            modelView.setCompoundDrawables(null, null, d, null);
+            d.setBounds(0, 0, dp(15), dp(15));
         }
+        modelView.setCompoundDrawables(dot, null, d, null);
         if (chat != null && chat.messages.isEmpty() && !busy) renderAll();
+    }
+
+    private void updateJump() {
+        if (jump == null || list == null) return;
+        int distance = list.getHeight() - (scroll.getScrollY() + scroll.getHeight());
+        boolean show = distance > dp(240);
+        if (show == jumpShown) return;
+        jumpShown = show;
+        if (show) {
+            jump.setVisibility(View.VISIBLE);
+            jump.setScaleX(0.7f);
+            jump.setScaleY(0.7f);
+            jump.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(220).setInterpolator(Theme.DECELERATE).start();
+        } else {
+            jump.animate().alpha(0f).scaleX(0.7f).scaleY(0.7f).setDuration(160)
+                    .withEndAction(() -> jump.setVisibility(View.GONE)).start();
+        }
     }
 
     // ---------------------------------------------------------------- messages
@@ -273,44 +344,64 @@ public class ChatActivity extends Activity {
     private View emptyState() {
         LinearLayout e = new LinearLayout(this);
         e.setOrientation(LinearLayout.VERTICAL);
-        e.setGravity(Gravity.CENTER);
-        e.setPadding(dp(4), dp(20), dp(4), dp(20));
-        OrbView orb = new OrbView(this, 12);
+        e.setGravity(Gravity.CENTER_VERTICAL);
+        e.setPadding(dp(4), dp(12), dp(4), dp(12));
+        OrbView orb = new OrbView(this, 10);
         orb.setDrawShadow(false);
         orb.setGlow(0.35f);
-        e.addView(orb, new LinearLayout.LayoutParams(dp(96), dp(96)));
-        TextView t = Theme.text(this, "How can I help?", Theme.Type.HEADLINE);
-        t.setGravity(Gravity.CENTER);
-        e.addView(t, Theme.lp(Theme.WRAP, Theme.WRAP, dp(18)));
-        TextView s = Theme.text(this, "Ask " + Prefs.provider(this).label + " anything, or tap + to send part of your screen.", Theme.Type.CAPTION);
+        LinearLayout.LayoutParams op = new LinearLayout.LayoutParams(dp(76), dp(76));
+        op.gravity = Gravity.CENTER_HORIZONTAL;
+        e.addView(orb, op);
+        int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+        String greet = hour < 5 ? "Up late?" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+        TextView g = Theme.text(this, greet, Theme.Type.DISPLAY);
+        g.setGravity(Gravity.CENTER);
+        g.setTextSize(30f);
+        e.addView(g, Theme.lp(Theme.MATCH, Theme.WRAP, dp(18)));
+        TextView s = Theme.text(this, "How can " + Prefs.provider(this).label + " help?", Theme.Type.BODY);
         s.setGravity(Gravity.CENTER);
-        e.addView(s, Theme.lp(Theme.WRAP, Theme.WRAP, dp(8)));
-        e.addView(suggestion(R.drawable.ic_scan, "Ask about my screen", this::capture), Theme.lp(Theme.MATCH, Theme.WRAP, dp(26)));
-        e.addView(suggestion(R.drawable.ic_edit, "Help me write a reply", () -> prefill("Help me write a reply to: ")), Theme.lp(Theme.MATCH, Theme.WRAP, dp(8)));
-        e.addView(suggestion(R.drawable.ic_bulb, "Explain something simply", () -> prefill("Explain this simply: ")), Theme.lp(Theme.MATCH, Theme.WRAP, dp(8)));
+        e.addView(s, Theme.lp(Theme.MATCH, Theme.WRAP, dp(6)));
+
+        LinearLayout r1 = new LinearLayout(this), r2 = new LinearLayout(this);
+        r1.setOrientation(LinearLayout.HORIZONTAL);
+        r2.setOrientation(LinearLayout.HORIZONTAL);
+        r1.addView(card(R.drawable.ic_scan, "Ask about my screen", "Capture part of it", this::capture), cardLp(false));
+        r1.addView(card(R.drawable.ic_edit, "Help me write", "A reply, email or post", () -> prefill("Help me write ")), cardLp(true));
+        r2.addView(card(R.drawable.ic_bulb, "Explain simply", "Any topic, step by step", () -> prefill("Explain simply: ")), cardLp(false));
+        r2.addView(card(R.drawable.ic_sparkles, "Solve a problem", "Math, code or logic", () -> prefill("Help me solve: ")), cardLp(true));
+        e.addView(r1, Theme.lp(Theme.MATCH, Theme.WRAP, dp(26)));
+        e.addView(r2, Theme.lp(Theme.MATCH, Theme.WRAP, dp(10)));
         for (int i = 0; i < e.getChildCount(); i++) Theme.enter(e.getChildAt(i), 60L * i);
         return e;
     }
 
-    private View suggestion(int icon, String text, Runnable action) {
-        LinearLayout r = new LinearLayout(this);
-        r.setOrientation(LinearLayout.HORIZONTAL);
-        r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setPadding(dp(16), dp(14), dp(16), dp(14));
-        r.setBackground(Theme.ripple(Theme.rounded(Theme.SURFACE, dp(18), Theme.HAIRLINE, Math.max(1, dp(0.8f))), dp(18)));
+    private LinearLayout.LayoutParams cardLp(boolean right) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, Theme.WRAP, 1);
+        if (right) p.leftMargin = dp(10);
+        return p;
+    }
+
+    private View card(int icon, String title, String sub, Runnable action) {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setPadding(dp(14), dp(14), dp(14), dp(14));
+        c.setMinimumHeight(dp(104));
+        c.setBackground(Theme.ripple(Theme.rounded(Theme.SURFACE, dp(20), Theme.HAIRLINE, Math.max(1, dp(0.8f))), dp(20)));
         FrameLayout ic = new FrameLayout(this);
-        ic.addView(Theme.icon(this, icon, Theme.TEXT_2, 18));
-        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(20), dp(20));
-        ip.rightMargin = dp(12);
-        r.addView(ic, ip);
-        r.addView(Theme.text(this, text, Theme.Type.CALLOUT));
-        r.setClickable(true);
-        r.setOnClickListener(v -> {
+        ic.setBackground(Theme.rounded(Theme.FILL, dp(10)));
+        ic.addView(Theme.icon(this, icon, Theme.ACCENT, 17));
+        c.addView(ic, new LinearLayout.LayoutParams(dp(32), dp(32)));
+        c.addView(Theme.text(this, title, Theme.Type.CALLOUT), Theme.lp(Theme.MATCH, Theme.WRAP, dp(12)));
+        TextView st = Theme.text(this, sub, Theme.Type.LABEL);
+        st.setTextColor(Theme.TEXT_3);
+        c.addView(st, Theme.lp(Theme.MATCH, Theme.WRAP, dp(4)));
+        c.setClickable(true);
+        c.setOnClickListener(v -> {
             Theme.tap(v);
             action.run();
         });
-        Theme.pressable(r, 0.97f);
-        return r;
+        Theme.pressable(c, 0.96f);
+        return c;
     }
 
     private void prefill(String s) {
@@ -344,9 +435,14 @@ public class ChatActivity extends Activity {
             t.setLineSpacing(dp(4), 1f);
             t.setMaxWidth(maxW);
             t.setPadding(dp(16), dp(11), dp(16), dp(11));
-            t.setBackground(Theme.rounded(0xFF262626, dp(22)));
+            float R = dp(22), r = dp(7);
+            android.graphics.drawable.GradientDrawable ub = new android.graphics.drawable.GradientDrawable();
+            ub.setColor(ToggleView.blend(0xFF232323, Theme.ACCENT, Theme.CLASSIC ? 0f : 0.22f));
+            ub.setCornerRadii(new float[]{R, R, R, R, r, r, R, R});
+            t.setBackground(ub);
             t.setOnLongClickListener(v -> {
-                copy(m.text);
+                Theme.tick(v);
+                messageMenu(m, false);
                 return true;
             });
             col.addView(t);
@@ -357,8 +453,9 @@ public class ChatActivity extends Activity {
     private View assistantView(Chats.Msg m, boolean last) {
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
+        col.addView(aiHeader(m), Theme.lp(Theme.MATCH, Theme.WRAP));
 
-        if (!m.thinking.isEmpty()) col.addView(thinkingBlock(m), Theme.lp(Theme.MATCH, Theme.WRAP));
+        if (!m.thinking.isEmpty()) col.addView(thinkingBlock(m), Theme.lp(Theme.MATCH, Theme.WRAP, dp(10)));
         if (m.searches > 0) {
             LinearLayout chip = new LinearLayout(this);
             chip.setOrientation(LinearLayout.HORIZONTAL);
@@ -378,25 +475,91 @@ public class ChatActivity extends Activity {
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f);
         t.setLineSpacing(dp(6), 1f);
         t.setTextIsSelectable(true);
-        col.addView(t, Theme.lp(Theme.MATCH, Theme.WRAP, col.getChildCount() == 0 ? 0 : dp(12)));
+        col.addView(t, Theme.lp(Theme.MATCH, Theme.WRAP, dp(10)));
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER_VERTICAL);
         actions.addView(smallIcon(R.drawable.ic_copy, () -> copy(m.text)));
+        View share = smallIcon(R.drawable.ic_external, () -> share(m.text));
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(dp(32), dp(32));
+        sp.leftMargin = dp(2);
+        actions.addView(share, sp);
         if (last) {
             View retry = smallIcon(R.drawable.ic_replay, this::retryLast);
             LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(dp(32), dp(32));
-            rp.leftMargin = dp(4);
+            rp.leftMargin = dp(2);
             actions.addView(retry, rp);
         }
-        View spacer = new View(this);
-        actions.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1));
-        TextView model = Theme.text(this, Provider.modelLabel(m.model), Theme.Type.LABEL);
-        model.setTextColor(Theme.TEXT_3);
-        actions.addView(model);
-        col.addView(actions, Theme.lp(Theme.MATCH, Theme.WRAP, dp(10)));
+        col.addView(actions, Theme.lp(Theme.MATCH, Theme.WRAP, dp(8)));
+        col.setOnLongClickListener(v -> {
+            Theme.tick(v);
+            messageMenu(m, last);
+            return true;
+        });
         return col;
+    }
+
+    private View aiHeader(Chats.Msg m) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        View dot = new View(this);
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR, Theme.ORB);
+        d.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        d.setStroke(Math.max(1, dp(0.8f)), 0x40FFFFFF);
+        dot.setBackground(d);
+        LinearLayout.LayoutParams dp20 = new LinearLayout.LayoutParams(dp(20), dp(20));
+        dp20.rightMargin = dp(8);
+        row.addView(dot, dp20);
+        Provider p = m.provider == null || m.provider.isEmpty() ? Prefs.provider(this) : Provider.fromId(m.provider);
+        TextView name = Theme.text(this, p.label, Theme.Type.CALLOUT);
+        name.setTypeface(Fonts.weight(this, 600));
+        row.addView(name);
+        if (m.model != null && !m.model.isEmpty()) {
+            TextView model = Theme.oneLine(Theme.text(this, "  " + Provider.modelLabel(m.model), Theme.Type.LABEL));
+            model.setTextColor(Theme.TEXT_3);
+            row.addView(model);
+        }
+        return row;
+    }
+
+    /** Press-and-hold on a message: copy, share, retry. */
+    private void messageMenu(Chats.Msg m, boolean canRetry) {
+        Sheet s = new Sheet(this);
+        String preview = MainActivity.firstLine(m.text);
+        s.title(m.isUser() ? "Your message" : "Reply", preview.length() > 90 ? preview.substring(0, 89) + "\u2026" : preview);
+        LinearLayout g = Rows.group(this);
+        Rows.add(g, Rows.row(this, R.drawable.ic_copy, "Copy", null, null, () -> {
+            s.close();
+            copy(m.text);
+        }));
+        Rows.add(g, Rows.row(this, R.drawable.ic_external, "Share", null, null, () -> {
+            s.close();
+            share(m.text);
+        }));
+        if (m.isUser()) {
+            Rows.add(g, Rows.row(this, R.drawable.ic_edit, "Edit in message box", null, null, () -> {
+                s.close();
+                prefill(m.text);
+            }));
+        } else if (canRetry) {
+            Rows.add(g, Rows.row(this, R.drawable.ic_replay, "Try again", null, null, () -> {
+                s.close();
+                retryLast();
+            }));
+        }
+        s.add(g, 16);
+        s.show();
+    }
+
+    private void share(String text) {
+        Intent i = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text);
+        try {
+            startActivity(Intent.createChooser(i, "Share"));
+        } catch (Exception ignored) {
+        }
     }
 
     private View thinkingBlock(Chats.Msg m) {
@@ -465,6 +628,7 @@ public class ChatActivity extends Activity {
         scroll.post(() -> {
             if (smooth) scroll.smoothScrollTo(0, list.getHeight());
             else scroll.scrollTo(0, list.getHeight());
+            scroll.postDelayed(this::updateJump, 350);
         });
     }
 
