@@ -1,0 +1,33 @@
+plugins {
+    id 'com.android.application'
+}
+
+// "My Files" – a file manager and app manager that shares My App's look, in a light theme.
+android {
+    namespace 'com.myapp.files'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.myapp.files'
+        minSdk 30          // Android 11+ (all-files access)
+        targetSdk 35
+        versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger())
+        versionName '1.0'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}

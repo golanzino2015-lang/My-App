@@ -103,3 +103,28 @@ app/src/main/java/com/questionbubble/app/
   GeminiClient.java         Gemini (Google Generative Language API)
   History.java / Prefs.java storage
 ```
+
+---
+
+# My Files (Android)
+
+A file manager and app manager in the `files/` module, built in My App's style but in a light theme:
+white surfaces, soft pearl gradients, black strokes and black text, Inter type, springy presses.
+It installs as its own app (`com.myapp.files`) next to My App.
+
+- **Home**: storage card with live usage, categories (Downloads, Images, Videos, Audio, Docs, APKs,
+  Archives, Apps) with counts, places (Internal storage, SD card, Downloads, Camera, Screenshots,
+  Documents, Android/data, Android/obb, any other folder via the system picker) and recent files.
+- **Files**: browse every folder with breadcrumbs, thumbnails for photos, videos, music and APK icons,
+  sort by name / date / size / type, show hidden files, search inside a folder.
+  - Tap to open, **⋮** for Open with, Share, Copy, Move, Rename, Compress to zip, Extract, Details,
+    Copy path, Delete. Tap an APK to install it.
+  - Press and hold to multi-select: Copy, Move, Share, Zip, Delete.
+  - **Paste** bar after Copy/Move; **+** for a new folder or text file.
+- **Apps**: every installed app (Installed / System / All), search, sort by name, size or last update.
+  Tap an app for Open, App info, Uninstall, Save APK (to `Download/My Files/Apps`), Share APK, Play Store.
+- **Android/data and obb**: Android 11–12 let you grant access to browse them here. Android 13+
+  blocks every third-party app from them, so My Files offers to open them in the phone's own Files app.
+
+On first launch tap **Allow access** and turn on *All files access* for My Files.
+The GitHub workflow builds it as the **MyFiles-apk** artifact.
