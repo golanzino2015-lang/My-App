@@ -1,0 +1,258 @@
+<title>Green Light Reflex</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one full-screen tap zone whose color IS the game state; stats strip pinned below. Single dark look by choice. */
+:root {
+  --ink: #f4f6f2;
+  --ink-dim: rgba(244, 246, 242, 0.72);
+  --idle: #1b1f24;
+  --wait: #c8202f;
+  --go: #13a65b;
+  --early: #d9861c;
+  --strip: #101317;
+  --line: rgba(255, 255, 255, 0.12);
+  --display: "Space Grotesk", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--strip);
+  color: var(--ink);
+  font-family: var(--display);
+  display: flex;
+  flex-direction: column;
+  -webkit-tap-highlight-color: transparent;
+}
+#zone {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding-block: 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--idle);
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  outline: none;
+}
+#zone:focus-visible { box-shadow: inset 0 0 0 3px var(--ink); }
+#zone[data-state="wait"] { background: var(--wait); }
+#zone[data-state="go"] { background: var(--go); }
+#zone[data-state="early"] { background: var(--early); }
+#zone[data-state="result"] { background: var(--idle); }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+#big {
+  font-size: clamp(2.6rem, 11vw, 6.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+#big.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+#sub {
+  font-size: 1.05rem;
+  color: var(--ink-dim);
+  max-width: 34ch;
+  text-wrap: balance;
+}
+
+#strip {
+  border-top: 1px solid var(--line);
+  padding-block: 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+}
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.stat b {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+}
+.stat span {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+#history {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+#history i {
+  font-style: normal;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink-dim);
+}
+#history i.best { color: var(--ink); border-color: var(--go); }
+#reset {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+#reset:hover, #reset:focus-visible { border-color: var(--ink); outline: none; }
+</style>
+
+<div id="zone" data-state="idle" tabindex="0" role="button" aria-live="polite">
+  <div class="eyebrow" id="eyebrow">Reaction test</div>
+  <div id="big">Click to start</div>
+  <div id="sub">Wait for red to turn green, then click as fast as you can. Space works too.</div>
+</div>
+
+<div id="strip">
+  <div class="stat"><b id="best">—</b><span>Best</span></div>
+  <div class="stat"><b id="avg">—</b><span>Avg last 5</span></div>
+  <div class="stat"><b id="tries">0</b><span>Tries</span></div>
+  <div id="history" aria-label="Recent times"></div>
+  <button id="reset" type="button">Reset</button>
+</div>
+
+<script>
+(() => {
+  const zone = document.getElementById("zone");
+  const eyebrow = document.getElementById("eyebrow");
+  const big = document.getElementById("big");
+  const sub = document.getElementById("sub");
+  const bestEl = document.getElementById("best");
+  const avgEl = document.getElementById("avg");
+  const triesEl = document.getElementById("tries");
+  const historyEl = document.getElementById("history");
+
+  let state = "idle";
+  let timer = null;
+  let goAt = 0;
+  let times = [];
+
+  try { times = JSON.parse(localStorage.getItem("glr-times") || "[]").filter(n => typeof n === "number"); } catch (e) { times = []; }
+
+  function save() {
+    try { localStorage.setItem("glr-times", JSON.stringify(times.slice(-50))); } catch (e) {}
+  }
+
+  function rating(ms) {
+    if (ms < 150) return "Inhuman. Are you sure you didn't guess?";
+    if (ms < 200) return "Elite reflexes.";
+    if (ms < 250) return "Faster than most people.";
+    if (ms < 300) return "Right around average (about 250 ms).";
+    if (ms < 400) return "A bit slow. Try again.";
+    return "Wake up! Try again.";
+  }
+
+  function set(s, eb, text, subText, isNum) {
+    state = s;
+    zone.dataset.state = s;
+    eyebrow.textContent = eb;
+    big.textContent = text;
+    big.classList.toggle("num", !!isNum);
+    sub.textContent = subText;
+  }
+
+  function renderStats() {
+    triesEl.textContent = times.length;
+    if (!times.length) {
+      bestEl.textContent = "—"; avgEl.textContent = "—"; historyEl.innerHTML = "";
+      return;
+    }
+    const best = Math.min(...times);
+    const last5 = times.slice(-5);
+    bestEl.textContent = best + " ms";
+    avgEl.textContent = Math.round(last5.reduce((a, b) => a + b, 0) / last5.length) + " ms";
+    historyEl.innerHTML = "";
+    times.slice(-8).reverse().forEach(t => {
+      const i = document.createElement("i");
+      i.textContent = t;
+      if (t === best) i.className = "best";
+      historyEl.appendChild(i);
+    });
+  }
+
+  function startRound() {
+    clearTimeout(timer);
+    set("wait", "Get ready", "Wait for green…", "Don't click yet.");
+    const delay = 1500 + Math.random() * 3500;
+    timer = setTimeout(() => {
+      goAt = performance.now();
+      set("go", "Now", "CLICK!", "");
+    }, delay);
+  }
+
+  function press(ev) {
+    // Read the clock first so nothing below adds to the measured time.
+    const now = performance.now();
+    if (state === "go") {
+      const stamp = ev && ev.timeStamp && ev.timeStamp >= goAt ? ev.timeStamp : now;
+      const ms = Math.max(0, Math.round(stamp - goAt));
+      times.push(ms);
+      save();
+      renderStats();
+      set("result", "Your time", ms + " ms", rating(ms) + " Click to go again.", true);
+    } else if (state === "wait") {
+      clearTimeout(timer);
+      set("early", "Too soon", "You jumped early", "Wait for green next time. Click to try again.");
+    } else {
+      startRound();
+    }
+  }
+
+  // pointerdown fires earlier than click, so the time is more accurate.
+  zone.addEventListener("pointerdown", e => {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    press(e);
+  });
+  document.addEventListener("keydown", e => {
+    if (e.repeat) return;
+    if (e.code === "Space" || e.code === "Enter") {
+      if (e.target && e.target.id === "reset") return;
+      e.preventDefault();
+      press(e);
+    }
+  });
+  document.getElementById("reset").addEventListener("click", () => {
+    clearTimeout(timer);
+    times = [];
+    save();
+    renderStats();
+    set("idle", "Reaction test", "Click to start", "Wait for red to turn green, then click as fast as you can. Space works too.");
+  });
+
+  renderStats();
+})();
+</script>
