@@ -125,7 +125,7 @@ final class Sheets {
         for (Provider p : Provider.values()) {
             boolean hasKey = !Prefs.apiKey(a, p).isEmpty();
             View radio = radio(a, p == current);
-            Rows.add(group, Rows.row(a, 0, p.label, p.company + " · " + (p == Provider.LOCAL ? "No key needed" : hasKey ? "Key added" : "No key yet"), radio, () -> {
+            Rows.add(group, Rows.row(a, 0, p.label, p.company + " · " + (hasKey ? "Key added" : "No key yet"), radio, () -> {
                 Prefs.setProvider(a, p);
                 Theme.tick(radio);
                 s.close();
@@ -139,10 +139,6 @@ final class Sheets {
 
     /** Edit + verify the API key for one provider. */
     static void apiKey(Activity a, Provider p, Runnable onSaved) {
-        if (p == Provider.LOCAL) {
-            a.startActivity(new Intent(a, TrainActivity.class));
-            return;
-        }
         Sheet s = new Sheet(a);
         s.title(p.label + " API key", "Stored only on this phone. Sent only to " + p.company + " when you ask a question.");
         KeyField field = new KeyField(a);
@@ -247,7 +243,7 @@ final class Sheets {
         in.requestFocus();
     }
 
-    static View radio(Activity a, boolean on) {
+    private static View radio(Activity a, boolean on) {
         FrameLayout f = new FrameLayout(a);
         f.setBackground(on ? Theme.rounded(Theme.ACCENT, Theme.dp(a, 11))
                 : Theme.rounded(0x00000000, Theme.dp(a, 11), Theme.TEXT_3, Theme.dp(a, 1.5f)));

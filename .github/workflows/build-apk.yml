@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write   # lets the build publish My AI's APK as a release download
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,12 +18,28 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Build APK
+      - name: Build APKs
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew :app:assembleDebug :myai:assembleDebug --no-daemon --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
           name: QuestionBubble-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MyAI-apk
+          path: myai/build/outputs/apk/debug/myai-debug.apk
+
+      # One fixed link that downloads the newest My AI APK directly (no zip):
+      # https://github.com/<owner>/<repo>/releases/download/my-ai/MyAI.apk
+      - name: Publish My AI download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp myai/build/outputs/apk/debug/myai-debug.apk MyAI.apk
+          gh release view my-ai >/dev/null 2>&1 || gh release create my-ai --title "My AI" \
+            --notes "Newest build of My AI. Download MyAI.apk below and install it." --target "$GITHUB_SHA"
+          gh release upload my-ai MyAI.apk --clobber

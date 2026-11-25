@@ -72,13 +72,6 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
         super.onPause();
     }
 
-    @Override
-    @SuppressWarnings("deprecation")
-    public void onBackPressed() {
-        super.onBackPressed();
-        overridePendingTransition(R.anim.screen_back_in, R.anim.screen_back_out);
-    }
-
     private String state() {
         if (ai.busy() != null) return "busy:" + ai.busy();
         if (!ai.exists()) return "none";
@@ -100,7 +93,6 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.addView(Rows.iconButton(this, R.drawable.ic_chevron_left, this::onBackPressed));
         add(bar, 6, step++);
 
         if (ai.busy() != null) {
@@ -206,20 +198,13 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
         said.addView(sampleA, Theme.lp(Theme.MATCH, Theme.WRAP, dp(6)));
         add(said, 10, step++);
 
-        // ---- use it
-        add(Rows.section(this, "Use"), 30, step++);
-        LinearLayout use = Rows.group(this);
-        Rows.add(use, Rows.row(this, R.drawable.ic_message, "Chat with " + ai.name(),
-                "Uses your app's chat screen", Rows.value(this, null), () -> {
-                    Prefs.setProvider(this, Provider.LOCAL);
-                    startActivity(new Intent(this, ChatActivity.class).putExtra(ChatActivity.EXTRA_NEW, true));
-                }));
-        boolean active = Prefs.provider(this) == Provider.LOCAL;
-        ToggleView useIt = new ToggleView(this, active);
-        useIt.setListener(on -> Prefs.setProvider(this, on ? Provider.LOCAL : Provider.OPENAI));
-        Rows.add(use, Rows.row(this, R.drawable.ic_bot, "Answer with " + ai.name(),
-                "Bubble and chat use My AI instead of an online AI", useIt, null));
-        add(use, 10, step++);
+        // ---- talk
+        PillButton chat = new PillButton(this, "Chat with " + ai.name(), PillButton.Kind.SECONDARY, R.drawable.ic_message, false);
+        chat.setOnClickListener(v -> {
+            startActivity(new Intent(this, ChatActivity.class));
+            overridePendingTransition(R.anim.screen_in, R.anim.screen_out);
+        });
+        add(chat, 14, step++);
 
         // ---- teach
         List<String[]> lessons = ai.lessons();

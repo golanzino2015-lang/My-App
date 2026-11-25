@@ -325,12 +325,11 @@ public class OnboardingActivity extends Activity {
             }
             case 2: {
                 chosen = Prefs.provider(this);
-                if (chosen == Provider.LOCAL) chosen = Provider.OPENAI;
                 parts.add(add(p, Theme.text(this, "Step 2 of 2", Theme.Type.OVERLINE), 0));
                 parts.add(add(p, Theme.text(this, "Choose your AI", Theme.Type.HEADLINE), 12));
                 TextView body = Theme.text(this, "", Theme.Type.BODY);
                 parts.add(add(p, body, 10));
-                Provider[] all = Provider.cloud();
+                Provider[] all = Provider.values();
                 String[] names = new String[all.length];
                 for (int i = 0; i < all.length; i++) names[i] = all[i].label;
                 SegmentedView picker = new SegmentedView(this, names, chosen.ordinal());

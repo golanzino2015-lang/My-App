@@ -361,30 +361,14 @@ public class MainActivity extends Activity {
             add(g, 10, step++);
         }
 
-        // ---- my own AI
-        add(Rows.section(this, "My AI"), 30, step++);
-        LinearLayout mine = Rows.group(this);
-        LocalAI local = LocalAI.get(this);
-        String mineSub = local.isTraining() ? "Training now · " + TrainActivity.compact(local.tokens()) + " words read"
-                : local.saved() ? local.name() + " · trained on " + TrainActivity.compact(local.tokens()) + " words"
-                : "Build and train your own AI from scratch";
-        Rows.add(mine, Rows.row(this, R.drawable.ic_cpu, local.saved() ? "Train " + local.name() : "Create My AI", mineSub,
-                Rows.value(this, null), () -> startActivity(new Intent(this, TrainActivity.class))));
-        add(mine, 10, step++);
-
         // ---- settings
         add(Rows.section(this, "Answers"), 30, step++);
         LinearLayout ai = Rows.group(this);
         Provider provider = Prefs.provider(this);
         Rows.add(ai, Rows.row(this, R.drawable.ic_bot, "AI", null, Rows.value(this, provider.label),
                 () -> Sheets.provider(this, this::render)));
-        if (provider == Provider.LOCAL) {
-            Rows.add(ai, Rows.row(this, R.drawable.ic_cpu, "Training", null, Rows.value(this, "Open"),
-                    () -> startActivity(new Intent(this, TrainActivity.class))));
-        } else {
-            Rows.add(ai, Rows.row(this, R.drawable.ic_key, provider.label + " key", null, Rows.value(this, Prefs.maskedKey(this)),
-                    () -> Sheets.apiKey(this, provider, this::render)));
-        }
+        Rows.add(ai, Rows.row(this, R.drawable.ic_key, provider.label + " key", null, Rows.value(this, Prefs.maskedKey(this)),
+                () -> Sheets.apiKey(this, provider, this::render)));
         Rows.add(ai, Rows.row(this, R.drawable.ic_cpu, "Model", null, Rows.value(this, Prefs.model(this)),
                 () -> Sheets.model(this, this::render)));
         LinearLayout styleRow = Rows.row(this, R.drawable.ic_sparkles, "Answer style",

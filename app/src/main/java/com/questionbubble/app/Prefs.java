@@ -48,7 +48,6 @@ final class Prefs {
     }
 
     static String apiKey(Context c, Provider pr) {
-        if (pr == Provider.LOCAL) return "on-device"; // My AI needs no key
         SharedPreferences p = sp(c);
         migrate(p);
         return p.getString("api_key_" + pr.id, "").trim();
@@ -157,7 +156,6 @@ final class Prefs {
     }
 
     static String maskedKey(Context c, Provider pr) {
-        if (pr == Provider.LOCAL) return "No key needed";
         String k = apiKey(c, pr);
         if (k.isEmpty()) return "Not set";
         String tail = k.length() > 4 ? k.substring(k.length() - 4) : k;

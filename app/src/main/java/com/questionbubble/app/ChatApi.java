@@ -55,13 +55,8 @@ final class ChatApi {
         String model = Prefs.model(c, p);
         boolean think = Prefs.thinking(c);
         boolean search = Prefs.webSearch(c);
-        long start = System.currentTimeMillis();
-        if (p == Provider.LOCAL) {
-            Chats.Msg mine = LocalAI.get(c).chatReply(chat);
-            mine.seconds = (int) Math.max(1, (System.currentTimeMillis() - start) / 1000);
-            return mine;
-        }
         if (key.isEmpty()) throw new Exception("Add your " + p.label + " API key in My App.");
+        long start = System.currentTimeMillis();
         Chats.Msg m;
         switch (p) {
             case CLAUDE:

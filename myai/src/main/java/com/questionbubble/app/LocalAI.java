@@ -467,22 +467,6 @@ final class LocalAI {
         return Words.detokenize(w);
     }
 
-    /** One answer for the chat screen, using the whole conversation. */
-    Chats.Msg chatReply(Chats.Chat chat) throws Exception {
-        ensureLoaded();
-        if (!exists()) throw new Exception("Create and train My AI first: Home → My AI.");
-        List<String[]> hist = new ArrayList<>();
-        String pendingUser = null, last = "";
-        for (Chats.Msg m : chat.messages) {
-            if (m.isUser()) { pendingUser = m.text; last = m.text; }
-            else if (pendingUser != null) { hist.add(new String[]{pendingUser, m.text}); pendingUser = null; }
-        }
-        if (pendingUser == null) throw new Exception("Type a message first.");
-        String text = reply(hist, last);
-        if (text.trim().isEmpty()) text = "…";
-        return new Chats.Msg("assistant", text, null, Provider.LOCAL.id, Provider.LOCAL.defaultModel, null, System.currentTimeMillis());
-    }
-
     // ---------------------------------------------------------------- saving
 
     private void save() {

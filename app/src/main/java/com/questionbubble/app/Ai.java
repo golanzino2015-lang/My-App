@@ -10,14 +10,6 @@ final class Ai {
         Provider p = Prefs.provider(c);
         String key = Prefs.apiKey(c, p);
         String model = Prefs.model(c, p);
-        if (p == Provider.LOCAL) {
-            if (image != null) throw new Exception("My AI can't read the screen yet. Use Type, or pick an online AI for scanning.");
-            LocalAI ai = LocalAI.get(c);
-            ai.ensureLoaded();
-            if (!ai.exists()) throw new Exception("Create and train My AI first: My App → My AI.");
-            String q = text.startsWith("Question: ") ? text.substring(10) : text;
-            return ai.reply(new java.util.ArrayList<>(), q);
-        }
         if (key.isEmpty()) throw new Exception("Add your " + p.label + " API key in My App.");
         switch (p) {
             case CLAUDE:
@@ -31,7 +23,6 @@ final class Ai {
 
     /** Throws with a readable message if the key doesn't work. */
     static void verify(Provider p, String key) throws Exception {
-        if (p == Provider.LOCAL) return;
         if (key == null || key.trim().isEmpty()) throw new Exception("Paste your API key first.");
         switch (p) {
             case CLAUDE:
