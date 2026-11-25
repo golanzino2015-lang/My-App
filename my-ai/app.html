@@ -1,0 +1,456 @@
+<title>My Own AI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one-screen phone app. Header, three tabs, a scrolling panel; chat input pinned at the bottom. */
+:root {
+  --bg: #f3f5f4; --surface: #ffffff; --sunken: #e8ecea; --line: #d5dcd9;
+  --ink: #18201d; --muted: #5d6b66; --accent: #0d7d6c; --accent-ink: #ffffff; --accent-soft: #d4ece7;
+  --warn: #a4511a; --bad: #b3261e; --good: #1d7a3a;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #101513; --surface: #18201d; --sunken: #0b0f0d; --line: #2a3430;
+  --ink: #e4ebe8; --muted: #93a39d; --accent: #3cc4ad; --accent-ink: #062a24; --accent-soft: #163a33;
+  --warn: #e39a5c; --bad: #ff8a80; --good: #6fd08c; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #101513; --surface: #18201d; --sunken: #0b0f0d; --line: #2a3430;
+  --ink: #e4ebe8; --muted: #93a39d; --accent: #3cc4ad; --accent-ink: #062a24; --accent-soft: #163a33;
+  --warn: #e39a5c; --bad: #ff8a80; --good: #6fd08c; color-scheme: dark; }
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font); }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; display: flex; flex-direction: column; max-width: 680px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: flex; align-items: center; gap: 10px; padding-block: 14px 10px; }
+.avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; flex: none; }
+.avatar canvas { width: 38px; height: 38px; border-radius: 50%; }
+header h1 { font-size: 19px; margin: 0; line-height: 1.1; }
+header .sub { font-size: 12.5px; color: var(--muted); }
+.who { flex: 1; min-width: 0; }
+.pill { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; background: var(--sunken); color: var(--muted); white-space: nowrap; }
+.pill.on { background: var(--accent-soft); color: var(--accent); }
+.pill.on::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .pill.on::before { animation: none; } }
+
+nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--sunken); border-radius: 12px; padding: 4px; }
+nav button { border: 0; background: none; padding: 8px 0; border-radius: 9px; color: var(--muted); font-weight: 600; font-size: 14.5px; }
+nav button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+
+main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: 12px; }
+.view { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-bottom: 16px; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.card h2 { font-size: 13px; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.muted { color: var(--muted); font-size: 14px; margin: 0; }
+
+.primary { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 12px; padding: 14px; font-weight: 700; font-size: 16px; }
+.ghost { background: none; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; color: var(--ink); }
+.danger { color: var(--bad); }
+button:disabled { opacity: .5; cursor: default; }
+
+/* Setup */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 14px; font-weight: 600; }
+input[type=text], textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; width: 100%; }
+.sizes { display: grid; gap: 8px; }
+.size { display: flex; gap: 12px; align-items: flex-start; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px; background: var(--surface); text-align: left; }
+.size[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.size b { display: block; }
+.size span { font-size: 13.5px; color: var(--muted); }
+.size .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); flex: none; margin-top: 2px; }
+.size[aria-checked="true"] .dot { border: 6px solid var(--accent); }
+
+/* Train */
+.stage { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.stage strong { font-size: 22px; }
+.meter { height: 8px; border-radius: 99px; background: var(--sunken); overflow: hidden; }
+.meter div { height: 100%; background: var(--accent); width: 0; transition: width .6s; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.stat { background: var(--sunken); border-radius: 10px; padding: 10px 12px; }
+.stat .k { font-size: 12px; color: var(--muted); }
+.stat .v { font: 600 17px/1.3 var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#chart { width: 100%; height: 150px; display: block; }
+.says { background: var(--sunken); border-radius: 10px; padding: 10px 12px; font-size: 15px; }
+.says .q { color: var(--muted); font-size: 13px; }
+
+/* Chat */
+.chat { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px; }
+.msg { max-width: 82%; padding: 9px 13px; border-radius: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 6px; }
+.msg.ai { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 6px; }
+.msg.ai.thinking { color: var(--muted); }
+.msg .teachit { display: block; margin-top: 4px; font-size: 12.5px; color: var(--accent); background: none; border: 0; padding: 0; text-decoration: underline; }
+.note { align-self: center; font-size: 13px; color: var(--muted); text-align: center; max-width: 90%; }
+.composer { display: flex; gap: 8px; padding-block: 8px calc(10px + env(safe-area-inset-bottom, 0px)); }
+.composer input { flex: 1; min-width: 0; border-radius: 22px; padding: 11px 16px; }
+.composer button { border-radius: 22px; padding: 0 18px; }
+
+/* Teach */
+.lesson { display: grid; gap: 8px; }
+.lesson-row { display: flex; gap: 10px; align-items: flex-start; border-top: 1px solid var(--line); padding-top: 10px; }
+.lesson-row:first-child { border-top: 0; padding-top: 0; }
+.lesson-row div { flex: 1; min-width: 0; font-size: 14.5px; overflow-wrap: anywhere; }
+.lesson-row .u { color: var(--muted); }
+.lesson-row button { background: none; border: 0; color: var(--muted); font-size: 18px; line-height: 1; padding: 2px 6px; }
+
+.confirm { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg);
+  padding: 9px 16px; border-radius: 99px; font-size: 14px; max-width: calc(100% - 32px); text-align: center; z-index: 5; }
+</style>
+
+<div class="app">
+  <header>
+    <div class="avatar"><canvas id="face" width="76" height="76" aria-hidden="true"></canvas></div>
+    <div class="who">
+      <h1 id="aiName">My AI</h1>
+      <div class="sub" id="aiSub">Built from scratch on this phone</div>
+    </div>
+    <span class="pill" id="status">Paused</span>
+  </header>
+
+  <!-- First run: create the brain -->
+  <main id="setup" hidden>
+    <div class="view">
+      <div class="card">
+        <h2>Create your AI</h2>
+        <p class="muted">Your AI starts as a brain full of random numbers. It knows nothing, not even a single word.
+          You train it right here on your phone, and it slowly learns to talk from thousands of example chats.</p>
+        <div class="field">
+          <label for="nameIn">Name</label>
+          <input id="nameIn" type="text" maxlength="20" value="Pip" autocomplete="off">
+        </div>
+        <div class="field">
+          <label id="sizeLbl">Brain size</label>
+          <div class="sizes" role="radiogroup" aria-labelledby="sizeLbl">
+            <button class="size" role="radio" data-size="tiny" aria-checked="false"><i class="dot"></i><div><b>Tiny · about 120 thousand numbers</b><span>Learns fastest. Simple answers in about an hour.</span></div></button>
+            <button class="size" role="radio" data-size="small" aria-checked="true"><i class="dot"></i><div><b>Small · about 280 thousand numbers</b><span>Recommended. Good answers after a few hours.</span></div></button>
+            <button class="size" role="radio" data-size="big" aria-checked="false"><i class="dot"></i><div><b>Big · about 780 thousand numbers</b><span>Smartest, but slow. Best trained overnight.</span></div></button>
+          </div>
+        </div>
+        <button class="primary" id="createBtn">Create brain</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- The app -->
+  <div id="appUI" hidden style="display:flex;flex-direction:column;flex:1;min-height:0">
+    <nav role="tablist">
+      <button role="tab" data-tab="chat" aria-selected="false">Chat</button>
+      <button role="tab" data-tab="train" aria-selected="true">Train</button>
+      <button role="tab" data-tab="teach" aria-selected="false">Teach</button>
+    </nav>
+
+    <main id="tab-train">
+      <div class="view">
+        <div class="card">
+          <div class="stage"><strong id="stageName">Random noise</strong><span class="muted" id="quizTxt">Quiz: not taken yet</span></div>
+          <div class="meter" aria-hidden="true"><div id="quizBar"></div></div>
+          <p class="muted" id="stageHelp">The brain is still random. Press Start training and watch it learn.</p>
+          <button class="primary" id="trainBtn">Start training</button>
+          <p class="muted" id="trainTip">Keep this page open with the screen on, ideally while charging. Progress saves automatically.</p>
+        </div>
+        <div class="card">
+          <h2>Right now it says</h2>
+          <div class="says" id="says"><div class="q">Nothing yet</div></div>
+        </div>
+        <div class="card">
+          <h2>Mistakes per word (lower is smarter)</h2>
+          <canvas id="chart" aria-label="Training error over time"></canvas>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">Words read</div><div class="v" id="sTokens">0</div></div>
+          <div class="stat"><div class="k">Learning steps</div><div class="v" id="sSteps">0</div></div>
+          <div class="stat"><div class="k">Time trained</div><div class="v" id="sTime">0m</div></div>
+          <div class="stat"><div class="k">Speed</div><div class="v" id="sSpeed">–</div></div>
+          <div class="stat"><div class="k">Brain size</div><div class="v" id="sParams">–</div></div>
+          <div class="stat"><div class="k">Words it knows</div><div class="v" id="sVocab">–</div></div>
+        </div>
+        <div class="card">
+          <h2>Start over</h2>
+          <p class="muted">Deletes this brain and everything it learned.</p>
+          <div class="confirm" id="resetBox"><button class="ghost danger" id="resetBtn">Delete brain</button></div>
+        </div>
+      </div>
+    </main>
+
+    <main id="tab-chat" hidden>
+      <div class="chat" id="chat" aria-live="polite"></div>
+      <form class="composer" id="composer">
+        <input id="msgIn" type="text" placeholder="Say something…" autocomplete="off" enterkeyhint="send">
+        <button class="primary" id="sendBtn">Send</button>
+      </form>
+    </main>
+
+    <main id="tab-teach" hidden>
+      <div class="view">
+        <div class="card">
+          <h2>Teach a new answer</h2>
+          <div class="field"><label for="tU">When I say</label><input id="tU" type="text" placeholder="what is my dog called" autocomplete="off"></div>
+          <div class="field"><label for="tA">It answers</label><input id="tA" type="text" placeholder="your dog is called rex." autocomplete="off"></div>
+          <button class="primary" id="addLesson">Add lesson</button>
+          <p class="muted">After adding lessons, train for a few minutes so they sink in. Short, simple sentences work best.</p>
+        </div>
+        <div class="card">
+          <h2 id="lessonCount">Your lessons</h2>
+          <div class="lesson" id="lessons"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<!--SCRIPTS-->
+
+<script>
+(function () {
+'use strict';
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('myai.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('myai.' + k, JSON.stringify(v)); } catch (e) { /* private mode */ } },
+};
+
+/* ---------- Connect to the AI (Web Worker if possible, otherwise this page) ---------- */
+let host, state = { exists: false }, prog = null, pending = new Map(), nextId = 1;
+function onMsg(m) {
+  if (m.type === 'state') { state = m; render(); }
+  else if (m.type === 'progress') { prog = m; renderProgress(); }
+  else if (m.type === 'reply') { const p = pending.get(m.id); if (p) { pending.delete(m.id); p(m.text); } }
+  else if (m.type === 'warn') toast(m.text);
+}
+function startHost() {
+  const src = ['engine-src', 'lessons-src', 'host-src'].map((id) => $(id).textContent).join('\n;\n');
+  let answered = false;
+  const fallback = () => {
+    if (host && host.mode === 'page') return;
+    host = { mode: 'page', send: (m) => setTimeout(() => self.TinyAI.handle(m, onMsg), 0) };
+    host.send({ type: 'init' });
+  };
+  try {
+    const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    w.onmessage = (e) => { answered = true; onMsg(e.data); };
+    w.onerror = () => { if (!answered) { w.terminate(); fallback(); } };
+    host = { mode: 'worker', send: (m) => w.postMessage(m) };
+    host.send({ type: 'init' });
+    setTimeout(() => { if (!answered) { w.terminate(); fallback(); } }, 4000);
+  } catch (e) { fallback(); }
+}
+const ask = (text, history) => new Promise((res) => {
+  const id = nextId++; pending.set(id, res);
+  host.send({ type: 'chat', id, text, history });
+});
+
+/* ---------- Little face that changes as it learns ---------- */
+function drawFace(level) {
+  const c = $('face'), g = c.getContext('2d'), s = getComputedStyle(document.documentElement);
+  const ink = s.getPropertyValue('--accent').trim();
+  g.clearRect(0, 0, 76, 76);
+  g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = 4; g.lineCap = 'round';
+  const eye = 4 + level * 2;
+  g.beginPath(); g.arc(26, 32, eye, 0, 7); g.arc(50, 32, eye, 0, 7); g.fill();
+  g.beginPath();
+  if (level < 1) { g.moveTo(26, 52); g.lineTo(50, 52); }
+  else g.arc(38, 44, 12, 0.2 * Math.PI, 0.8 * Math.PI);
+  g.stroke();
+}
+
+/* ---------- Rendering ---------- */
+let tab = store.get('tab', 'train');
+function render() {
+  $('setup').hidden = state.exists;
+  $('appUI').hidden = !state.exists;
+  if (!state.exists) { $('aiName').textContent = 'My AI'; $('status').hidden = true; drawFace(0); return; }
+  $('status').hidden = false;
+  $('aiName').textContent = state.name;
+  $('aiSub').textContent = `${state.sizeLabel} brain · built from scratch on this phone`;
+  $('sParams').textContent = fmt(state.params);
+  $('sVocab').textContent = fmt(state.words);
+  $('msgIn').placeholder = `Say something to ${state.name}…`;
+  renderTraining(state.training);
+  renderLessons();
+  showTab(tab);
+}
+function renderTraining(on) {
+  $('status').textContent = on ? 'Training' : 'Paused';
+  $('status').classList.toggle('on', on);
+  $('trainBtn').textContent = on ? 'Pause training' : (prog && prog.step > 0 ? 'Continue training' : 'Start training');
+  wake(on);
+}
+const fmt = (n) => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : String(Math.round(n));
+function fmtTime(s) { const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h}h ${m}m` : `${m}m ${Math.floor(s % 60)}s`; }
+
+const STAGES = [
+  [0, 'Random noise', 'The brain is still random. Press Start training and watch it learn.'],
+  [1, 'Babbling', 'It is learning which words exist. Expect gibberish for a while.'],
+  [2, 'First words', 'It knows lots of words and is starting to put them in order.'],
+  [3, 'Simple sentences', 'It can make sentences, but often mixes up facts.'],
+  [4, 'Getting smarter', 'It answers many questions correctly. Keep going!'],
+  [5, 'Knows its lessons', 'It has learned most of its lessons. More training still helps.'],
+];
+function stageOf(p) {
+  const loss = p.lossHist.length ? p.lossHist[p.lossHist.length - 1][1] : 99;
+  const score = p.quiz ? p.quiz.score / p.quiz.total : 0;
+  if (score >= 0.75) return 5;
+  if (score >= 0.4) return 4;
+  if (loss < 2.2) return 3;
+  if (loss < 3.6) return 2;
+  if (p.step > 0) return 1;
+  return 0;
+}
+function renderProgress() {
+  if (!prog) return;
+  renderTraining(prog.training);
+  const st = STAGES[stageOf(prog)];
+  $('stageName').textContent = st[1];
+  $('stageHelp').textContent = st[2];
+  drawFace(Math.min(4, st[0]));
+  if (prog.quiz) {
+    $('quizTxt').textContent = `Quiz: ${prog.quiz.score} of ${prog.quiz.total} right`;
+    $('quizBar').style.width = (100 * prog.quiz.score / prog.quiz.total) + '%';
+  }
+  if (prog.sample) $('says').innerHTML = `<div class="q">You: ${esc(prog.sample.q)}</div><div>${esc(prog.sample.a)}</div>`;
+  $('sTokens').textContent = fmt(prog.tokens);
+  $('sSteps').textContent = fmt(prog.step);
+  $('sTime').textContent = fmtTime(prog.seconds);
+  $('sSpeed').textContent = prog.training && prog.perSec ? `${prog.perSec}/s` : '–';
+  drawChart(prog.lossHist);
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+function drawChart(hist) {
+  const c = $('chart'), dpr = Math.min(devicePixelRatio || 1, 2);
+  const w = c.clientWidth, h = c.clientHeight;
+  if (!w) return;
+  c.width = w * dpr; c.height = h * dpr;
+  const g = c.getContext('2d'); g.scale(dpr, dpr);
+  const s = getComputedStyle(document.documentElement);
+  const accent = s.getPropertyValue('--accent').trim(), line = s.getPropertyValue('--line').trim(), muted = s.getPropertyValue('--muted').trim();
+  g.font = '11px ' + s.getPropertyValue('--mono');
+  const L = 30, B = 18, top = 8, maxY = 8;
+  const y = (v) => top + (h - top - B) * (1 - Math.min(v, maxY) / maxY);
+  g.strokeStyle = line; g.fillStyle = muted; g.lineWidth = 1;
+  for (const v of [0, 2, 4, 6, 8]) { g.beginPath(); g.moveTo(L, y(v)); g.lineTo(w, y(v)); g.stroke(); g.fillText(String(v), 4, y(v) + 4); }
+  if (hist.length < 2) { g.fillText('Starts drawing once training begins', L + 8, h / 2); return; }
+  const maxX = hist[hist.length - 1][0], x = (s2) => L + (w - L - 6) * (s2 / maxX);
+  g.fillText('step ' + fmt(maxX), w - 70, h - 4);
+  g.beginPath(); g.moveTo(x(hist[0][0]), y(hist[0][1]));
+  for (const [s2, v] of hist) g.lineTo(x(s2), y(v));
+  g.strokeStyle = accent; g.lineWidth = 2; g.stroke();
+  g.lineTo(x(maxX), y(0)); g.lineTo(x(hist[0][0]), y(0)); g.closePath();
+  g.globalAlpha = 0.12; g.fillStyle = accent; g.fill(); g.globalAlpha = 1;
+  const last = hist[hist.length - 1];
+  g.beginPath(); g.arc(x(last[0]), y(last[1]), 3.5, 0, 7); g.fillStyle = accent; g.fill();
+}
+
+function showTab(t) {
+  tab = t; store.set('tab', t);
+  for (const b of document.querySelectorAll('nav button')) b.setAttribute('aria-selected', String(b.dataset.tab === t));
+  for (const n of ['chat', 'train', 'teach']) $('tab-' + n).hidden = n !== t;
+  if (t === 'train') renderProgress();
+  if (t === 'chat') { if (!$('chat').children.length) intro(); $('chat').scrollTop = 1e9; }
+}
+document.querySelectorAll('nav button').forEach((b) => b.onclick = () => showTab(b.dataset.tab));
+
+/* ---------- Setup ---------- */
+let size = 'small';
+document.querySelectorAll('.size').forEach((b) => b.onclick = () => {
+  size = b.dataset.size;
+  document.querySelectorAll('.size').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+});
+$('createBtn').onclick = () => {
+  $('createBtn').disabled = true; $('createBtn').textContent = 'Creating…';
+  tab = 'train';
+  host.send({ type: 'create', name: $('nameIn').value || 'Pip', size });
+  setTimeout(() => { $('createBtn').disabled = false; $('createBtn').textContent = 'Create brain'; }, 1500);
+};
+
+/* ---------- Train ---------- */
+$('trainBtn').onclick = () => host.send({ type: 'train', on: !(prog && prog.training) });
+let lock = null;
+async function wake(on) {
+  try {
+    if (on && !lock && navigator.wakeLock) { lock = await navigator.wakeLock.request('screen'); lock.onrelease = () => { lock = null; }; }
+    else if (!on && lock) { await lock.release(); lock = null; }
+  } catch (e) { /* not allowed here; the tip asks to keep the screen on */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && prog && prog.training) wake(true);
+  if (document.visibilityState === 'hidden') host && host.send({ type: 'save' });
+});
+function askReset() {
+  const box = $('resetBox');
+  box.innerHTML = '<span class="muted">Delete everything it learned?</span><button class="ghost danger" id="yesReset">Yes, delete</button><button class="ghost" id="noReset">Keep it</button>';
+  $('noReset').onclick = () => { box.innerHTML = '<button class="ghost danger" id="resetBtn">Delete brain</button>'; $('resetBtn').onclick = askReset; };
+  $('yesReset').onclick = () => {
+    host.send({ type: 'reset' }); prog = null; $('chat').innerHTML = ''; chatLog.length = 0;
+    box.innerHTML = '<button class="ghost danger" id="resetBtn">Delete brain</button>'; $('resetBtn').onclick = askReset;
+  };
+}
+$('resetBtn').onclick = askReset;
+
+/* ---------- Chat ---------- */
+const chatLog = [];
+function bubble(cls, text) {
+  const d = document.createElement('div'); d.className = 'msg ' + cls; d.textContent = text;
+  $('chat').append(d); $('chat').scrollTop = 1e9; return d;
+}
+function intro() {
+  const n = document.createElement('div'); n.className = 'note';
+  n.textContent = `${state.name} only knows what it learned during training. Wrong answers are normal for a tiny brain. Tap "Teach this" under a reply to correct it.`;
+  $('chat').append(n);
+}
+$('composer').onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $('msgIn').value.trim();
+  if (!text) return;
+  $('msgIn').value = '';
+  bubble('me', text);
+  const b = bubble('ai thinking', 'thinking…');
+  const reply = await ask(text, chatLog.slice(-4));
+  b.classList.remove('thinking'); b.textContent = reply;
+  const fix = document.createElement('button'); fix.className = 'teachit'; fix.textContent = 'Teach this';
+  fix.onclick = () => { $('tU').value = text; $('tA').value = ''; showTab('teach'); $('tA').focus(); };
+  b.append(fix);
+  chatLog.push([text, reply]);
+  $('chat').scrollTop = 1e9;
+};
+
+/* ---------- Teach ---------- */
+function renderLessons() {
+  const list = state.taught || [];
+  $('lessonCount').textContent = list.length ? `Your lessons (${list.length})` : 'Your lessons';
+  const box = $('lessons'); box.innerHTML = '';
+  if (!list.length) { box.innerHTML = '<p class="muted">No lessons yet. Add one above, like your name, your pet, or a favorite food.</p>'; return; }
+  list.forEach(([u, a], i) => {
+    const row = document.createElement('div'); row.className = 'lesson-row';
+    row.innerHTML = `<div><div class="u">You: ${esc(u)}</div><div>${esc(state.name)}: ${esc(a)}</div></div><button aria-label="Remove lesson">×</button>`;
+    row.querySelector('button').onclick = () => host.send({ type: 'teach', pairs: list.filter((_, j) => j !== i) });
+    box.append(row);
+  });
+}
+$('addLesson').onclick = () => {
+  const u = $('tU').value.trim(), a = $('tA').value.trim();
+  if (!u || !a) { toast('Fill in both boxes first.'); return; }
+  host.send({ type: 'teach', pairs: [...(state.taught || []), [u, a]] });
+  $('tU').value = ''; $('tA').value = '';
+  toast('Lesson added. Train for a few minutes so it sticks.');
+};
+
+let toastT;
+function toast(t) { $('toast').textContent = t; $('toast').hidden = false; clearTimeout(toastT); toastT = setTimeout(() => $('toast').hidden = true, 3200); }
+
+addEventListener('resize', () => prog && drawChart(prog.lossHist));
+drawFace(0);
+startHost();
+})();
+</script>

@@ -1,0 +1,1558 @@
+<title>My Own AI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one-screen phone app. Header, three tabs, a scrolling panel; chat input pinned at the bottom. */
+:root {
+  --bg: #f3f5f4; --surface: #ffffff; --sunken: #e8ecea; --line: #d5dcd9;
+  --ink: #18201d; --muted: #5d6b66; --accent: #0d7d6c; --accent-ink: #ffffff; --accent-soft: #d4ece7;
+  --warn: #a4511a; --bad: #b3261e; --good: #1d7a3a;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #101513; --surface: #18201d; --sunken: #0b0f0d; --line: #2a3430;
+  --ink: #e4ebe8; --muted: #93a39d; --accent: #3cc4ad; --accent-ink: #062a24; --accent-soft: #163a33;
+  --warn: #e39a5c; --bad: #ff8a80; --good: #6fd08c; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #101513; --surface: #18201d; --sunken: #0b0f0d; --line: #2a3430;
+  --ink: #e4ebe8; --muted: #93a39d; --accent: #3cc4ad; --accent-ink: #062a24; --accent-soft: #163a33;
+  --warn: #e39a5c; --bad: #ff8a80; --good: #6fd08c; color-scheme: dark; }
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font); }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; display: flex; flex-direction: column; max-width: 680px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: flex; align-items: center; gap: 10px; padding-block: 14px 10px; }
+.avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; flex: none; }
+.avatar canvas { width: 38px; height: 38px; border-radius: 50%; }
+header h1 { font-size: 19px; margin: 0; line-height: 1.1; }
+header .sub { font-size: 12.5px; color: var(--muted); }
+.who { flex: 1; min-width: 0; }
+.pill { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; background: var(--sunken); color: var(--muted); white-space: nowrap; }
+.pill.on { background: var(--accent-soft); color: var(--accent); }
+.pill.on::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .pill.on::before { animation: none; } }
+
+nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--sunken); border-radius: 12px; padding: 4px; }
+nav button { border: 0; background: none; padding: 8px 0; border-radius: 9px; color: var(--muted); font-weight: 600; font-size: 14.5px; }
+nav button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+
+main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: 12px; }
+.view { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-bottom: 16px; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.card h2 { font-size: 13px; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.muted { color: var(--muted); font-size: 14px; margin: 0; }
+
+.primary { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 12px; padding: 14px; font-weight: 700; font-size: 16px; }
+.ghost { background: none; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; color: var(--ink); }
+.danger { color: var(--bad); }
+button:disabled { opacity: .5; cursor: default; }
+
+/* Setup */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 14px; font-weight: 600; }
+input[type=text], textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; width: 100%; }
+.sizes { display: grid; gap: 8px; }
+.size { display: flex; gap: 12px; align-items: flex-start; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px; background: var(--surface); text-align: left; }
+.size[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.size b { display: block; }
+.size span { font-size: 13.5px; color: var(--muted); }
+.size .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); flex: none; margin-top: 2px; }
+.size[aria-checked="true"] .dot { border: 6px solid var(--accent); }
+
+/* Train */
+.stage { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.stage strong { font-size: 22px; }
+.meter { height: 8px; border-radius: 99px; background: var(--sunken); overflow: hidden; }
+.meter div { height: 100%; background: var(--accent); width: 0; transition: width .6s; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.stat { background: var(--sunken); border-radius: 10px; padding: 10px 12px; }
+.stat .k { font-size: 12px; color: var(--muted); }
+.stat .v { font: 600 17px/1.3 var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#chart { width: 100%; height: 150px; display: block; }
+.says { background: var(--sunken); border-radius: 10px; padding: 10px 12px; font-size: 15px; }
+.says .q { color: var(--muted); font-size: 13px; }
+
+/* Chat */
+.chat { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px; }
+.msg { max-width: 82%; padding: 9px 13px; border-radius: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 6px; }
+.msg.ai { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 6px; }
+.msg.ai.thinking { color: var(--muted); }
+.msg .teachit { display: block; margin-top: 4px; font-size: 12.5px; color: var(--accent); background: none; border: 0; padding: 0; text-decoration: underline; }
+.note { align-self: center; font-size: 13px; color: var(--muted); text-align: center; max-width: 90%; }
+.composer { display: flex; gap: 8px; padding-block: 8px calc(10px + env(safe-area-inset-bottom, 0px)); }
+.composer input { flex: 1; min-width: 0; border-radius: 22px; padding: 11px 16px; }
+.composer button { border-radius: 22px; padding: 0 18px; }
+
+/* Teach */
+.lesson { display: grid; gap: 8px; }
+.lesson-row { display: flex; gap: 10px; align-items: flex-start; border-top: 1px solid var(--line); padding-top: 10px; }
+.lesson-row:first-child { border-top: 0; padding-top: 0; }
+.lesson-row div { flex: 1; min-width: 0; font-size: 14.5px; overflow-wrap: anywhere; }
+.lesson-row .u { color: var(--muted); }
+.lesson-row button { background: none; border: 0; color: var(--muted); font-size: 18px; line-height: 1; padding: 2px 6px; }
+
+.confirm { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg);
+  padding: 9px 16px; border-radius: 99px; font-size: 14px; max-width: calc(100% - 32px); text-align: center; z-index: 5; }
+</style>
+
+<div class="app">
+  <header>
+    <div class="avatar"><canvas id="face" width="76" height="76" aria-hidden="true"></canvas></div>
+    <div class="who">
+      <h1 id="aiName">My AI</h1>
+      <div class="sub" id="aiSub">Built from scratch on this phone</div>
+    </div>
+    <span class="pill" id="status">Paused</span>
+  </header>
+
+  <!-- First run: create the brain -->
+  <main id="setup" hidden>
+    <div class="view">
+      <div class="card">
+        <h2>Create your AI</h2>
+        <p class="muted">Your AI starts as a brain full of random numbers. It knows nothing, not even a single word.
+          You train it right here on your phone, and it slowly learns to talk from thousands of example chats.</p>
+        <div class="field">
+          <label for="nameIn">Name</label>
+          <input id="nameIn" type="text" maxlength="20" value="Pip" autocomplete="off">
+        </div>
+        <div class="field">
+          <label id="sizeLbl">Brain size</label>
+          <div class="sizes" role="radiogroup" aria-labelledby="sizeLbl">
+            <button class="size" role="radio" data-size="tiny" aria-checked="false"><i class="dot"></i><div><b>Tiny · about 120 thousand numbers</b><span>Learns fastest. Simple answers in about an hour.</span></div></button>
+            <button class="size" role="radio" data-size="small" aria-checked="true"><i class="dot"></i><div><b>Small · about 280 thousand numbers</b><span>Recommended. Good answers after a few hours.</span></div></button>
+            <button class="size" role="radio" data-size="big" aria-checked="false"><i class="dot"></i><div><b>Big · about 780 thousand numbers</b><span>Smartest, but slow. Best trained overnight.</span></div></button>
+          </div>
+        </div>
+        <button class="primary" id="createBtn">Create brain</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- The app -->
+  <div id="appUI" hidden style="display:flex;flex-direction:column;flex:1;min-height:0">
+    <nav role="tablist">
+      <button role="tab" data-tab="chat" aria-selected="false">Chat</button>
+      <button role="tab" data-tab="train" aria-selected="true">Train</button>
+      <button role="tab" data-tab="teach" aria-selected="false">Teach</button>
+    </nav>
+
+    <main id="tab-train">
+      <div class="view">
+        <div class="card">
+          <div class="stage"><strong id="stageName">Random noise</strong><span class="muted" id="quizTxt">Quiz: not taken yet</span></div>
+          <div class="meter" aria-hidden="true"><div id="quizBar"></div></div>
+          <p class="muted" id="stageHelp">The brain is still random. Press Start training and watch it learn.</p>
+          <button class="primary" id="trainBtn">Start training</button>
+          <p class="muted" id="trainTip">Keep this page open with the screen on, ideally while charging. Progress saves automatically.</p>
+        </div>
+        <div class="card">
+          <h2>Right now it says</h2>
+          <div class="says" id="says"><div class="q">Nothing yet</div></div>
+        </div>
+        <div class="card">
+          <h2>Mistakes per word (lower is smarter)</h2>
+          <canvas id="chart" aria-label="Training error over time"></canvas>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">Words read</div><div class="v" id="sTokens">0</div></div>
+          <div class="stat"><div class="k">Learning steps</div><div class="v" id="sSteps">0</div></div>
+          <div class="stat"><div class="k">Time trained</div><div class="v" id="sTime">0m</div></div>
+          <div class="stat"><div class="k">Speed</div><div class="v" id="sSpeed">–</div></div>
+          <div class="stat"><div class="k">Brain size</div><div class="v" id="sParams">–</div></div>
+          <div class="stat"><div class="k">Words it knows</div><div class="v" id="sVocab">–</div></div>
+        </div>
+        <div class="card">
+          <h2>Start over</h2>
+          <p class="muted">Deletes this brain and everything it learned.</p>
+          <div class="confirm" id="resetBox"><button class="ghost danger" id="resetBtn">Delete brain</button></div>
+        </div>
+      </div>
+    </main>
+
+    <main id="tab-chat" hidden>
+      <div class="chat" id="chat" aria-live="polite"></div>
+      <form class="composer" id="composer">
+        <input id="msgIn" type="text" placeholder="Say something…" autocomplete="off" enterkeyhint="send">
+        <button class="primary" id="sendBtn">Send</button>
+      </form>
+    </main>
+
+    <main id="tab-teach" hidden>
+      <div class="view">
+        <div class="card">
+          <h2>Teach a new answer</h2>
+          <div class="field"><label for="tU">When I say</label><input id="tU" type="text" placeholder="what is my dog called" autocomplete="off"></div>
+          <div class="field"><label for="tA">It answers</label><input id="tA" type="text" placeholder="your dog is called rex." autocomplete="off"></div>
+          <button class="primary" id="addLesson">Add lesson</button>
+          <p class="muted">After adding lessons, train for a few minutes so they sink in. Short, simple sentences work best.</p>
+        </div>
+        <div class="card">
+          <h2 id="lessonCount">Your lessons</h2>
+          <div class="lesson" id="lessons"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script id="engine-src">
+/* Tiny AI engine: a GPT-style transformer written from scratch.
+ * No libraries. Runs in a Web Worker, on the page's main thread, or in Node.
+ * Exposes self.TinyAI = { handle(msg, post), ...internals for tests }.
+ */
+'use strict';
+(function (root) {
+
+/* ======================= Random numbers ======================= */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function randn(r) {
+  let u = 0; while (u === 0) u = r();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r());
+}
+
+/* ======================= Words <-> numbers ======================= */
+const SPECIAL = ['<pad>', '<unk>', '<user>', '<ai>', '<end>'];
+const UNK = 1, USER = 2, AI = 3, END = 4;
+const UNK_MARK = 'zzunk';
+
+const SHORT = {
+  whats: 'what is', 'what\'s': 'what is', whos: 'who is', 'who\'s': 'who is', wheres: 'where is',
+  'where\'s': 'where is', hows: 'how is', 'how\'s': 'how is', 'it\'s': 'it is', 'i\'m': 'i am', im: 'i am',
+  'you\'re': 'you are', youre: 'you are', ur: 'your', u: 'you', r: 'are', 'don\'t': 'do not', dont: 'do not',
+  'doesn\'t': 'does not', doesnt: 'does not', 'can\'t': 'cannot', cant: 'cannot', 'won\'t': 'will not',
+  'isn\'t': 'is not', isnt: 'is not', 'aren\'t': 'are not', 'i\'ve': 'i have', 'i\'ll': 'i will',
+  'that\'s': 'that is', thats: 'that is', 'there\'s': 'there is', 'let\'s': 'let us', wanna: 'want to',
+  gonna: 'going to', gotta: 'got to', thx: 'thanks', ty: 'thank you', pls: 'please', plz: 'please',
+  wat: 'what', wut: 'what', sup: 'what is up', wassup: 'what is up', yeah: 'yes', yea: 'yes', yep: 'yes',
+  yup: 'yes', nope: 'no', nah: 'no', cuz: 'because', idk: 'i do not know', doin: 'doing', goin: 'going',
+  'didn\'t': 'did not', didnt: 'did not', 'wasn\'t': 'was not', 'haven\'t': 'have not', 'couldn\'t': 'could not',
+  'what\'re': 'what are', 'how\'re': 'how are', 'you\'ve': 'you have', 'we\'re': 'we are', 'they\'re': 'they are',
+  'he\'s': 'he is', 'she\'s': 'she is', ok: 'okay', k: 'okay', kk: 'okay',
+};
+
+/** Text -> list of lowercase words and punctuation, with slang and contractions expanded. */
+function normalize(text) {
+  const s = String(text).toLowerCase().replace(/[’‘`]/g, '\'')
+    .replace(/(\d)\s*\+\s*(?=\d)/g, '$1 plus ').replace(/(\d)\s*-\s*(?=\d)/g, '$1 minus ')
+    .replace(/<unk>/g, ` ${UNK_MARK} `);
+  const out = [];
+  for (let w of s.match(/[a-z0-9']+|[.,!?]/g) || []) {
+    w = w.replace(/^'+|'+$/g, '');
+    if (!w) continue;
+    if (/^hi+$/.test(w)) w = 'hi';
+    else if (/^hey+$/.test(w)) w = 'hey';
+    else if (/^(ha){2,}h?$/.test(w) || /^(he){2,}$/.test(w)) w = 'haha';
+    else if (/^hel+o+$/.test(w)) w = 'hello';
+    else if (/^no+$/.test(w)) w = 'no';
+    else if (/^yes+$/.test(w)) w = 'yes';
+    else if (/^(lol)+$/.test(w)) w = 'lol';
+    else if (/^okay+$/.test(w)) w = 'okay';
+    const exp = SHORT[w];
+    if (exp) { out.push(...exp.split(' ')); continue; }
+    w = w.replace(/'/g, '');
+    if (w) out.push(w);
+  }
+  return out.filter((w, i) => !(/^[.,!?]$/.test(w) && /^[.,!?]$/.test(out[i - 1] || '')));
+}
+const isPunct = (w) => /^[.,!?]$/.test(w);
+/** What the user typed: words only, punctuation dropped. */
+const userWords = (text) => normalize(text).filter((w) => !isPunct(w));
+
+class Vocab {
+  constructor(words) { this.words = []; this.map = new Map(); for (const w of words) this.add(w); }
+  add(w) { if (!this.map.has(w)) { this.map.set(w, this.words.length); this.words.push(w); } }
+  id(w) { return w === UNK_MARK ? UNK : (this.map.has(w) ? this.map.get(w) : UNK); }
+  get size() { return this.words.length; }
+}
+
+function encodeExchange(vocab, u, a) {
+  const ids = [USER];
+  for (const w of userWords(u)) ids.push(vocab.id(w));
+  ids.push(AI);
+  if (a != null) { for (const w of normalize(a)) ids.push(vocab.id(w)); ids.push(END); }
+  return ids;
+}
+
+let PROPER = [];        // multi-word proper names, filled by the lesson generator
+const WORD_FIX = { i: 'I', ai: 'AI', dc: 'DC', tv: 'TV' };
+function detokenize(words) {
+  let s = '';
+  for (const w of words) s += isPunct(w) ? w : (s ? ' ' : '') + w;
+  for (const p of PROPER) {
+    s = s.replace(new RegExp('\\b' + p + '\\b', 'g'), p.replace(/\b[a-z]/g, (c) => c.toUpperCase()));
+  }
+  s = s.replace(/\b[a-zA-Z]+\b/g, (w) => WORD_FIX[w.toLowerCase()] || w);
+  return s.replace(/(^|[.!?]\s+)([a-z])/g, (m, p, c) => p + c.toUpperCase());
+}
+
+/* ======================= The transformer ======================= */
+const SIZES = {
+  tiny: { C: 48, L: 2, H: 4, T: 64, label: 'Tiny' },
+  small: { C: 64, L: 4, H: 4, T: 64, label: 'Small' },
+  big: { C: 96, L: 6, H: 6, T: 64, label: 'Big' },
+};
+
+function tensorList(cfg) {
+  const { V, C, L, T } = cfg, list = [];
+  const add = (name, size, decay, init) => list.push({ name, size, decay, init });
+  const proj = 0.02 / Math.sqrt(2 * L);
+  add('wte', V * C, true, 0.02);
+  add('wpe', T * C, false, 0.01);
+  for (let l = 0; l < L; l++) {
+    add(`${l}.ln1w`, C, false, 'one'); add(`${l}.ln1b`, C, false, 0);
+    add(`${l}.qkvw`, 3 * C * C, true, 0.02); add(`${l}.qkvb`, 3 * C, false, 0);
+    add(`${l}.projw`, C * C, true, proj); add(`${l}.projb`, C, false, 0);
+    add(`${l}.ln2w`, C, false, 'one'); add(`${l}.ln2b`, C, false, 0);
+    add(`${l}.fcw`, 4 * C * C, true, 0.02); add(`${l}.fcb`, 4 * C, false, 0);
+    add(`${l}.fcprojw`, C * 4 * C, true, proj); add(`${l}.fcprojb`, C, false, 0);
+  }
+  add('lnfw', C, false, 'one'); add('lnfb', C, false, 0);
+  let off = 0;
+  for (const t of list) { t.off = off; off += t.size; }
+  return { list, total: off };
+}
+
+class GPT {
+  constructor(cfg, seed = 1) {
+    this.cfg = { ...cfg };
+    const { list, total } = tensorList(this.cfg);
+    this.tensors = list; this.numParams = total;
+    this.params = new Float32Array(total);
+    this.grads = new Float32Array(total);
+    this.m = new Float32Array(total);
+    this.v = new Float32Array(total);
+    this.step = 0;
+    const r = mulberry32(seed);
+    for (const t of list) {
+      const p = this.params.subarray(t.off, t.off + t.size);
+      if (t.init === 'one') p.fill(1);
+      else if (t.init) for (let i = 0; i < t.size; i++) p[i] = randn(r) * t.init;
+    }
+    this._views();
+    this.acts = null; this.actsKey = '';
+  }
+
+  _views() {
+    const P = {}, G = {};
+    for (const t of this.tensors) {
+      P[t.name] = this.params.subarray(t.off, t.off + t.size);
+      G[t.name] = this.grads.subarray(t.off, t.off + t.size);
+    }
+    this.P = P; this.G = G;
+  }
+
+  /** Grow the word table when new words are taught. Keeps everything already learned. */
+  growVocab(newV, seed = 7) {
+    if (newV <= this.cfg.V) return;
+    const old = this;
+    const next = new GPT({ ...this.cfg, V: newV }, seed);
+    for (const t of next.tensors) {
+      const o = old.tensors.find((x) => x.name === t.name);
+      const n = Math.min(o.size, t.size);
+      for (const k of ['params', 'm', 'v']) next[k].set(old[k].subarray(o.off, o.off + n), t.off);
+    }
+    next.step = old.step;
+    Object.assign(this, next);
+    this._views();
+    this.acts = null; this.actsKey = '';
+  }
+
+  // Buffers are sized for the longest sequence; shorter ones use the front part.
+  _ensureActs(B) {
+    const key = String(B);
+    if (this.actsKey === key) return;
+    const { C, L, H, V } = this.cfg, T = this.cfg.T, N = B * T;
+    const f = (n) => new Float32Array(n);
+    const layer = () => ({
+      ln1: f(N * C), ln1m: f(N), ln1r: f(N), qkv: f(N * 3 * C), att: f(B * H * T * T), atty: f(N * C),
+      attproj: f(N * C), res2: f(N * C), ln2: f(N * C), ln2m: f(N), ln2r: f(N), fch: f(N * 4 * C),
+      fchg: f(N * 4 * C), fcproj: f(N * C), res3: f(N * C),
+    });
+    const set = () => ({ encoded: f(N * C), layers: Array.from({ length: L }, layer), lnf: f(N * C), lnfm: f(N), lnfr: f(N) });
+    this.acts = set();
+    this.dacts = set();
+    this.probs = f(N * V);
+    this.actsKey = key;
+  }
+
+  /** Runs the network. Returns mean loss if targets are given. lastOnly: logits for the final position only. */
+  forward(inputs, targets, B, T, lastOnly = false) {
+    const { C, L, H, V } = this.cfg, N = B * T, P = this.P;
+    this._ensureActs(B);
+    const a = this.acts;
+    encoderForward(a.encoded, inputs, P.wte, P.wpe, B, T, C);
+    let res = a.encoded;
+    for (let l = 0; l < L; l++) {
+      const A = a.layers[l];
+      layernormForward(A.ln1, A.ln1m, A.ln1r, res, P[`${l}.ln1w`], P[`${l}.ln1b`], N, C);
+      matmulForward(A.qkv, A.ln1, P[`${l}.qkvw`], P[`${l}.qkvb`], N, C, 3 * C);
+      attentionForward(A.atty, A.att, A.qkv, B, T, C, H);
+      matmulForward(A.attproj, A.atty, P[`${l}.projw`], P[`${l}.projb`], N, C, C);
+      add(A.res2, res, A.attproj);
+      layernormForward(A.ln2, A.ln2m, A.ln2r, A.res2, P[`${l}.ln2w`], P[`${l}.ln2b`], N, C);
+      matmulForward(A.fch, A.ln2, P[`${l}.fcw`], P[`${l}.fcb`], N, C, 4 * C);
+      geluForward(A.fchg, A.fch);
+      matmulForward(A.fcproj, A.fchg, P[`${l}.fcprojw`], P[`${l}.fcprojb`], N, 4 * C, C);
+      add(A.res3, A.res2, A.fcproj);
+      res = A.res3;
+    }
+    layernormForward(a.lnf, a.lnfm, a.lnfr, res, P.lnfw, P.lnfb, N, C);
+    if (lastOnly) {
+      const row = this.probs.subarray(0, V);
+      matmulForward(row, a.lnf.subarray((N - 1) * C, N * C), P.wte, null, 1, C, V);
+      return row; // raw logits for the last position
+    }
+    matmulForward(this.probs, a.lnf, P.wte, null, N, C, V);
+    let loss = 0;
+    for (let n = 0; n < N; n++) {
+      const row = this.probs.subarray(n * V, (n + 1) * V);
+      let max = -Infinity;
+      for (let v = 0; v < V; v++) if (row[v] > max) max = row[v];
+      let sum = 0;
+      for (let v = 0; v < V; v++) { row[v] = Math.exp(row[v] - max); sum += row[v]; }
+      for (let v = 0; v < V; v++) row[v] /= sum;
+      if (targets) loss -= Math.log(row[targets[n]] + 1e-12);
+    }
+    return targets ? loss / N : 0;
+  }
+
+  /** Adds this batch's gradients into this.grads. Call after forward(). scale: weight of this batch. */
+  backward(inputs, targets, B, T, scale = 1) {
+    const { C, L, H, V } = this.cfg, N = B * T, P = this.P, G = this.G, a = this.acts, d = this.dacts;
+    zeroActs(d);
+    const dlogits = this.probs; // reuse in place
+    const k = scale / N;
+    for (let n = 0; n < N; n++) {
+      const row = dlogits.subarray(n * V, (n + 1) * V);
+      for (let v = 0; v < V; v++) row[v] *= k;
+      row[targets[n]] -= k;
+    }
+    matmulBackward(d.lnf, G.wte, null, dlogits, a.lnf, P.wte, N, C, V);
+    const last = L > 0 ? a.layers[L - 1].res3 : a.encoded;
+    const dlast = L > 0 ? d.layers[L - 1].res3 : d.encoded;
+    layernormBackward(dlast, G.lnfw, G.lnfb, d.lnf, last, P.lnfw, a.lnfm, a.lnfr, N, C);
+    for (let l = L - 1; l >= 0; l--) {
+      const A = a.layers[l], D = d.layers[l];
+      const res = l === 0 ? a.encoded : a.layers[l - 1].res3;
+      const dres = l === 0 ? d.encoded : d.layers[l - 1].res3;
+      accum(D.res2, D.res3); accum(D.fcproj, D.res3);
+      matmulBackward(D.fchg, G[`${l}.fcprojw`], G[`${l}.fcprojb`], D.fcproj, A.fchg, P[`${l}.fcprojw`], N, 4 * C, C);
+      geluBackward(D.fch, A.fch, D.fchg);
+      matmulBackward(D.ln2, G[`${l}.fcw`], G[`${l}.fcb`], D.fch, A.ln2, P[`${l}.fcw`], N, C, 4 * C);
+      layernormBackward(D.res2, G[`${l}.ln2w`], G[`${l}.ln2b`], D.ln2, A.res2, P[`${l}.ln2w`], A.ln2m, A.ln2r, N, C);
+      accum(dres, D.res2); accum(D.attproj, D.res2);
+      matmulBackward(D.atty, G[`${l}.projw`], G[`${l}.projb`], D.attproj, A.atty, P[`${l}.projw`], N, C, C);
+      attentionBackward(D.qkv, D.atty, A.qkv, A.att, B, T, C, H);
+      matmulBackward(D.ln1, G[`${l}.qkvw`], G[`${l}.qkvb`], D.qkv, A.ln1, P[`${l}.qkvw`], N, C, 3 * C);
+      layernormBackward(dres, G[`${l}.ln1w`], G[`${l}.ln1b`], D.ln1, res, P[`${l}.ln1w`], A.ln1m, A.ln1r, N, C);
+    }
+    encoderBackward(G.wte, G.wpe, d.encoded, inputs, B, T, C);
+  }
+
+  /** AdamW update with gradient clipping, then clears gradients. */
+  update(lr, wd = 0.01, b1 = 0.9, b2 = 0.99, eps = 1e-8, clip = 1) {
+    const g = this.grads;
+    let norm = 0;
+    for (let i = 0; i < g.length; i++) norm += g[i] * g[i];
+    norm = Math.sqrt(norm);
+    const gs = norm > clip ? clip / norm : 1;
+    this.step++;
+    const c1 = 1 - Math.pow(b1, this.step), c2 = 1 - Math.pow(b2, this.step);
+    const p = this.params, m = this.m, v = this.v;
+    for (const t of this.tensors) {
+      const dec = t.decay ? wd : 0;
+      for (let i = t.off, e = t.off + t.size; i < e; i++) {
+        const gi = g[i] * gs;
+        m[i] = b1 * m[i] + (1 - b1) * gi;
+        v[i] = b2 * v[i] + (1 - b2) * gi * gi;
+        p[i] -= lr * ((m[i] / c1) / (Math.sqrt(v[i] / c2) + eps) + dec * p[i]);
+      }
+    }
+    g.fill(0);
+    return norm;
+  }
+}
+
+function zeroActs(s) {
+  s.encoded.fill(0); s.lnf.fill(0);
+  for (const l of s.layers) for (const k in l) l[k].fill(0);
+}
+function add(out, a, b) { for (let i = 0; i < out.length; i++) out[i] = a[i] + b[i]; }
+function accum(out, a) { for (let i = 0; i < out.length; i++) out[i] += a[i]; }
+
+function encoderForward(out, inp, wte, wpe, B, T, C) {
+  for (let b = 0; b < B; b++) for (let t = 0; t < T; t++) {
+    const o = (b * T + t) * C, e = inp[b * T + t] * C, p = t * C;
+    for (let i = 0; i < C; i++) out[o + i] = wte[e + i] + wpe[p + i];
+  }
+}
+function encoderBackward(dwte, dwpe, dout, inp, B, T, C) {
+  for (let b = 0; b < B; b++) for (let t = 0; t < T; t++) {
+    const o = (b * T + t) * C, e = inp[b * T + t] * C, p = t * C;
+    for (let i = 0; i < C; i++) { dwte[e + i] += dout[o + i]; dwpe[p + i] += dout[o + i]; }
+  }
+}
+function layernormForward(out, mean, rstd, inp, w, b, N, C) {
+  for (let n = 0; n < N; n++) {
+    const x = n * C;
+    let m = 0; for (let i = 0; i < C; i++) m += inp[x + i]; m /= C;
+    let v = 0; for (let i = 0; i < C; i++) { const d = inp[x + i] - m; v += d * d; } v /= C;
+    const s = 1 / Math.sqrt(v + 1e-5);
+    for (let i = 0; i < C; i++) out[x + i] = (inp[x + i] - m) * s * w[i] + b[i];
+    mean[n] = m; rstd[n] = s;
+  }
+}
+function layernormBackward(dinp, dw, db, dout, inp, w, mean, rstd, N, C) {
+  for (let n = 0; n < N; n++) {
+    const x = n * C, m = mean[n], s = rstd[n];
+    let dm = 0, dnm = 0;
+    for (let i = 0; i < C; i++) {
+      const norm = (inp[x + i] - m) * s, dn = w[i] * dout[x + i];
+      dm += dn; dnm += dn * norm;
+    }
+    dm /= C; dnm /= C;
+    for (let i = 0; i < C; i++) {
+      const norm = (inp[x + i] - m) * s, dn = w[i] * dout[x + i];
+      db[i] += dout[x + i]; dw[i] += norm * dout[x + i];
+      dinp[x + i] += (dn - dm - norm * dnm) * s;
+    }
+  }
+}
+/** out[N,OC] = inp[N,C] · w[OC,C]ᵀ + bias */
+function matmulForward(out, inp, w, bias, N, C, OC) {
+  for (let n = 0; n < N; n++) {
+    const x = n * C, o = n * OC;
+    for (let j = 0; j < OC; j++) {
+      const r = j * C;
+      let s = bias ? bias[j] : 0;
+      for (let i = 0; i < C; i++) s += inp[x + i] * w[r + i];
+      out[o + j] = s;
+    }
+  }
+}
+function matmulBackward(dinp, dw, db, dout, inp, w, N, C, OC) {
+  for (let n = 0; n < N; n++) {
+    const x = n * C, o = n * OC;
+    for (let j = 0; j < OC; j++) {
+      const g = dout[o + j];
+      if (g === 0) continue;
+      const r = j * C;
+      for (let i = 0; i < C; i++) { dinp[x + i] += g * w[r + i]; dw[r + i] += g * inp[x + i]; }
+      if (db) db[j] += g;
+    }
+  }
+}
+function attentionForward(out, att, qkv, B, T, C, H) {
+  const C3 = 3 * C, hs = C / H, scale = 1 / Math.sqrt(hs);
+  for (let b = 0; b < B; b++) for (let t = 0; t < T; t++) for (let h = 0; h < H; h++) {
+    const q = b * T * C3 + t * C3 + h * hs, a = ((b * H + h) * T + t) * T;
+    let max = -Infinity;
+    for (let t2 = 0; t2 <= t; t2++) {
+      const k = b * T * C3 + t2 * C3 + h * hs + C;
+      let s = 0; for (let i = 0; i < hs; i++) s += qkv[q + i] * qkv[k + i];
+      s *= scale; att[a + t2] = s; if (s > max) max = s;
+    }
+    let sum = 0;
+    for (let t2 = 0; t2 <= t; t2++) { const e = Math.exp(att[a + t2] - max); att[a + t2] = e; sum += e; }
+    for (let t2 = 0; t2 <= t; t2++) att[a + t2] /= sum;
+    for (let t2 = t + 1; t2 < T; t2++) att[a + t2] = 0;
+    const o = (b * T + t) * C + h * hs;
+    for (let i = 0; i < hs; i++) out[o + i] = 0;
+    for (let t2 = 0; t2 <= t; t2++) {
+      const v = b * T * C3 + t2 * C3 + h * hs + 2 * C, p = att[a + t2];
+      for (let i = 0; i < hs; i++) out[o + i] += p * qkv[v + i];
+    }
+  }
+}
+function attentionBackward(dqkv, dout, qkv, att, B, T, C, H) {
+  const C3 = 3 * C, hs = C / H, scale = 1 / Math.sqrt(hs);
+  const datt = new Float32Array(T);
+  for (let b = 0; b < B; b++) for (let t = 0; t < T; t++) for (let h = 0; h < H; h++) {
+    const q = b * T * C3 + t * C3 + h * hs, a = ((b * H + h) * T + t) * T, o = (b * T + t) * C + h * hs;
+    let dot = 0;
+    for (let t2 = 0; t2 <= t; t2++) {
+      const v = b * T * C3 + t2 * C3 + h * hs + 2 * C, p = att[a + t2];
+      let s = 0;
+      for (let i = 0; i < hs; i++) { s += qkv[v + i] * dout[o + i]; dqkv[v + i] += p * dout[o + i]; }
+      datt[t2] = s; dot += p * s;
+    }
+    for (let t2 = 0; t2 <= t; t2++) {
+      const g = att[a + t2] * (datt[t2] - dot) * scale;
+      if (g === 0) continue;
+      const k = b * T * C3 + t2 * C3 + h * hs + C;
+      for (let i = 0; i < hs; i++) { dqkv[q + i] += g * qkv[k + i]; dqkv[k + i] += g * qkv[q + i]; }
+    }
+  }
+}
+const GS = Math.sqrt(2 / Math.PI);
+function geluForward(out, inp) {
+  for (let i = 0; i < inp.length; i++) {
+    const x = inp[i];
+    out[i] = 0.5 * x * (1 + Math.tanh(GS * (x + 0.044715 * x * x * x)));
+  }
+}
+function geluBackward(dinp, inp, dout) {
+  for (let i = 0; i < inp.length; i++) {
+    const x = inp[i], u = GS * (x + 0.044715 * x * x * x), th = Math.tanh(u);
+    const sech2 = 1 - th * th;
+    dinp[i] += (0.5 * (1 + th) + 0.5 * x * sech2 * GS * (1 + 3 * 0.044715 * x * x)) * dout[i];
+  }
+}
+
+root.TinyAICore = {
+  mulberry32, randn, normalize, userWords, Vocab, encodeExchange, detokenize, SPECIAL, UNK, USER, AI, END,
+  SIZES, GPT, setProper(list) { PROPER = list.slice().sort((a, b) => b.length - a.length); },
+};
+})(typeof self !== 'undefined' ? self : globalThis);
+
+</script>
+<script id="lessons-src">
+/* Starter lessons: thousands of small example chats generated from templates.
+ * Every fact here is something the AI can learn. Edit freely to change what it knows.
+ */
+'use strict';
+(function (root) {
+
+const NAMES = ['alex', 'sam', 'maya', 'noah', 'emma', 'liam', 'olivia', 'leo', 'mia', 'ethan', 'ava', 'lucas',
+  'zoe', 'adam', 'sara', 'daniel', 'lily', 'omar', 'nina', 'ben', 'yuki', 'david', 'amir', 'chloe', 'max',
+  'ella', 'jack', 'ruby', 'ali', 'grace', 'tom', 'hana', 'eli', 'anna', 'ivan', 'luna', 'jake', 'nora',
+  'ryan', 'iris', 'kai', 'rosa', 'sofia', 'theo', 'aria', 'mateo', 'jamal', 'priya', 'chen', 'lea', 'yosef',
+  'dana', 'gal', 'tal', 'noa', 'itay', 'roni', 'shira', 'eitan', 'ori'];
+
+const COLORS = [['the sky', 'blue'], ['grass', 'green'], ['the sun', 'yellow'], ['snow', 'white'],
+  ['a banana', 'yellow'], ['coal', 'black'], ['a carrot', 'orange'], ['a lemon', 'yellow'],
+  ['a strawberry', 'red'], ['a tomato', 'red'], ['milk', 'white'], ['chocolate', 'brown'],
+  ['the ocean', 'blue'], ['a leaf', 'green'], ['a frog', 'green'], ['a pumpkin', 'orange'],
+  ['a flamingo', 'pink'], ['a polar bear', 'white'], ['a crow', 'black'], ['a cherry', 'red'],
+  ['an eggplant', 'purple'], ['a fire truck', 'red'], ['the moon', 'gray'], ['a zebra', 'black and white'],
+  ['a panda', 'black and white'], ['an orange', 'orange'], ['blood', 'red'], ['a cucumber', 'green']];
+
+const SOUNDS = [['dog', 'woof'], ['cat', 'meow'], ['cow', 'moo'], ['duck', 'quack'], ['sheep', 'baa'],
+  ['pig', 'oink'], ['horse', 'neigh'], ['lion', 'roar'], ['owl', 'hoo hoo'], ['bee', 'buzz'],
+  ['snake', 'hiss'], ['frog', 'ribbit'], ['mouse', 'squeak'], ['rooster', 'cock a doodle doo'],
+  ['donkey', 'hee haw'], ['bird', 'tweet tweet'], ['chicken', 'cluck'], ['wolf', 'awoo'], ['goat', 'maa']];
+
+const WHAT_IS = [
+  ['a dog', 'a dog is an animal that barks. many people keep dogs as pets.'],
+  ['a cat', 'a cat is a small furry animal that says meow. cats are popular pets.'],
+  ['a fish', 'a fish is an animal that lives in water and breathes with gills.'],
+  ['a bird', 'a bird is an animal with feathers and wings. most birds can fly.'],
+  ['a cow', 'a cow is a big farm animal that gives us milk.'],
+  ['a horse', 'a horse is a big strong animal that people can ride.'],
+  ['a lion', 'a lion is a big wild cat. people call it the king of the jungle.'],
+  ['an elephant', 'an elephant is the biggest land animal. it has a long trunk.'],
+  ['a whale', 'a whale is a huge animal that lives in the ocean. it is a mammal, not a fish.'],
+  ['a shark', 'a shark is a big fish with sharp teeth that lives in the ocean.'],
+  ['a bee', 'a bee is a small flying insect that makes honey.'],
+  ['a spider', 'a spider is a small animal with eight legs that spins webs.'],
+  ['a penguin', 'a penguin is a bird that cannot fly, but it swims very well.'],
+  ['a dinosaur', 'dinosaurs were giant reptiles that lived millions of years ago.'],
+  ['an apple', 'an apple is a round fruit that can be red, green or yellow.'],
+  ['a banana', 'a banana is a long yellow fruit.'],
+  ['pizza', 'pizza is a food made of bread, tomato sauce and cheese.'],
+  ['bread', 'bread is a food made from flour and water, baked in an oven.'],
+  ['a car', 'a car is a machine with four wheels that people drive.'],
+  ['a bus', 'a bus is a big vehicle that carries many people.'],
+  ['a train', 'a train is a long vehicle that runs on tracks.'],
+  ['a plane', 'a plane is a machine with wings that flies in the sky.'],
+  ['a boat', 'a boat is a vehicle that floats and moves on water.'],
+  ['a house', 'a house is a building where people live.'],
+  ['a school', 'a school is a place where kids go to learn.'],
+  ['a book', 'a book is a set of pages with words or pictures that you read.'],
+  ['a phone', 'a phone is a device you use to call, text and use apps. i live in one!'],
+  ['a computer', 'a computer is a machine that follows instructions very fast.'],
+  ['the sun', 'the sun is a star. it gives the earth light and heat.'],
+  ['the moon', 'the moon is a big ball of rock that goes around the earth.'],
+  ['a star', 'a star is a giant ball of hot gas that gives off light.'],
+  ['the earth', 'the earth is the planet we live on.'],
+  ['a planet', 'a planet is a big round world that goes around a star.'],
+  ['a tree', 'a tree is a tall plant with a trunk, branches and leaves.'],
+  ['a flower', 'a flower is the colorful part of a plant.'],
+  ['rain', 'rain is water that falls from clouds.'],
+  ['snow', 'snow is frozen water that falls from clouds when it is cold.'],
+  ['water', 'water is a clear liquid. all living things need it.'],
+  ['fire', 'fire is the heat and light that comes from something burning.'],
+  ['ice', 'ice is frozen water.'],
+  ['a doctor', 'a doctor is a person who helps sick people get better.'],
+  ['a teacher', 'a teacher is a person who helps people learn.'],
+  ['an ai', 'an ai is a computer program that can learn. i am an ai!'],
+  ['a robot', 'a robot is a machine that can move and do jobs by itself.'],
+  ['music', 'music is sounds put together in a way that is nice to hear.'],
+  ['a friend', 'a friend is someone you like and trust.'],
+  ['the ocean', 'the ocean is a huge body of salty water.'],
+  ['a mountain', 'a mountain is a very tall piece of land.'],
+  ['a river', 'a river is water that flows across the land to the sea.'],
+  ['a volcano', 'a volcano is a mountain that can erupt with hot lava.'],
+  ['a rainbow', 'a rainbow is an arc of colors in the sky. it appears when sunlight shines through rain.'],
+  ['a cloud', 'a cloud is a group of tiny water drops floating in the sky.'],
+  ['math', 'math is the study of numbers, shapes and patterns.'],
+  ['the internet', 'the internet connects computers all around the world.'],
+  ['a game', 'a game is something you play for fun.'],
+  ['money', 'money is what people use to buy things.'],
+];
+
+const HOMES = [['fish', 'in water'], ['bird', 'in a nest, often up in a tree'], ['bee', 'in a hive'],
+  ['lion', 'in africa, on grasslands called the savanna'], ['penguin', 'in cold places like antarctica'],
+  ['camel', 'in the desert'], ['monkey', 'in the jungle, up in the trees'], ['cow', 'on a farm'],
+  ['polar bear', 'in the arctic, where it is very cold'], ['shark', 'in the ocean'],
+  ['kangaroo', 'in australia'], ['panda', 'in the forests of china'], ['frog', 'near ponds and rivers'],
+  ['whale', 'in the ocean'], ['spider', 'in a web']];
+
+const LEGS = [['dog', 'a dog has four legs.'], ['cat', 'a cat has four legs.'], ['horse', 'a horse has four legs.'],
+  ['cow', 'a cow has four legs.'], ['spider', 'a spider has eight legs.'], ['bird', 'a bird has two legs.'],
+  ['chicken', 'a chicken has two legs.'], ['person', 'a person has two legs.'], ['ant', 'an ant has six legs.'],
+  ['bee', 'a bee has six legs.'], ['fish', 'a fish has no legs. it swims with fins.'],
+  ['snake', 'a snake has no legs. it slides on its belly.'], ['octopus', 'an octopus has eight arms.'],
+  ['duck', 'a duck has two legs.'], ['elephant', 'an elephant has four legs.']];
+
+const CAN = [['bird', 'fly', true], ['penguin', 'fly', false], ['bat', 'fly', true], ['bee', 'fly', true],
+  ['dog', 'fly', false], ['cat', 'fly', false], ['fish', 'fly', false], ['pig', 'fly', false],
+  ['ostrich', 'fly', false], ['plane', 'fly', true], ['fish', 'swim', true], ['dog', 'swim', true],
+  ['penguin', 'swim', true], ['duck', 'swim', true], ['whale', 'swim', true], ['rock', 'swim', false],
+  ['dog', 'talk', false], ['parrot', 'talk', true], ['car', 'fly', false], ['snake', 'walk', false]];
+
+const CAPITALS = [['france', 'paris'], ['germany', 'berlin'], ['italy', 'rome'], ['spain', 'madrid'],
+  ['portugal', 'lisbon'], ['japan', 'tokyo'], ['china', 'beijing'], ['india', 'new delhi'],
+  ['russia', 'moscow'], ['canada', 'ottawa'], ['mexico', 'mexico city'], ['brazil', 'brasilia'],
+  ['argentina', 'buenos aires'], ['peru', 'lima'], ['chile', 'santiago'], ['egypt', 'cairo'],
+  ['kenya', 'nairobi'], ['nigeria', 'abuja'], ['australia', 'canberra'], ['greece', 'athens'],
+  ['ireland', 'dublin'], ['poland', 'warsaw'], ['sweden', 'stockholm'], ['norway', 'oslo'],
+  ['finland', 'helsinki'], ['denmark', 'copenhagen'], ['the netherlands', 'amsterdam'],
+  ['turkey', 'ankara'], ['south korea', 'seoul'], ['thailand', 'bangkok'], ['vietnam', 'hanoi'],
+  ['the united kingdom', 'london'], ['england', 'london'], ['the united states', 'washington dc'],
+  ['ukraine', 'kyiv'], ['austria', 'vienna'], ['switzerland', 'bern'], ['belgium', 'brussels'],
+  ['cuba', 'havana'], ['colombia', 'bogota']];
+
+const OPPOSITES = [['hot', 'cold'], ['big', 'small'], ['up', 'down'], ['happy', 'sad'], ['fast', 'slow'],
+  ['day', 'night'], ['light', 'dark'], ['open', 'closed'], ['tall', 'short'], ['wet', 'dry'],
+  ['full', 'empty'], ['hard', 'soft'], ['loud', 'quiet'], ['left', 'right'], ['in', 'out'], ['yes', 'no'],
+  ['good', 'bad'], ['black', 'white'], ['first', 'last'], ['early', 'late'], ['strong', 'weak'],
+  ['clean', 'dirty'], ['push', 'pull'], ['win', 'lose'], ['begin', 'end'], ['top', 'bottom'],
+  ['inside', 'outside'], ['heavy', 'light']];
+
+const SHAPES = [['triangle', 'three'], ['square', 'four'], ['rectangle', 'four'], ['pentagon', 'five'],
+  ['hexagon', 'six'], ['octagon', 'eight']];
+
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september',
+  'october', 'november', 'december'];
+
+// [question variants, answer variants]
+const FACTS = [
+  [['how many days are in a week'], ['there are 7 days in a week.']],
+  [['what are the days of the week'], ['monday, tuesday, wednesday, thursday, friday, saturday and sunday.']],
+  [['how many months are in a year'], ['there are 12 months in a year.']],
+  [['what are the months of the year'], ['january, february, march, april, may, june, july, august, september, october, november and december.']],
+  [['how many days are in a year'], ['there are 365 days in a year, or 366 in a leap year.']],
+  [['how many hours are in a day'], ['there are 24 hours in a day.']],
+  [['how many minutes are in an hour'], ['there are 60 minutes in an hour.']],
+  [['how many seconds are in a minute'], ['there are 60 seconds in a minute.']],
+  [['what are the seasons', 'what are the four seasons'], ['the four seasons are spring, summer, autumn and winter.']],
+  [['what is the coldest season', 'which season is the coldest'], ['winter is the coldest season.']],
+  [['what is the hottest season', 'which season is the hottest'], ['summer is the hottest season.']],
+  [['when is christmas'], ['christmas is on december 25.']],
+  [['what is the first month of the year'], ['january is the first month of the year.']],
+  [['what is the last month of the year'], ['december is the last month of the year.']],
+  [['what day is it today', 'what day is it', 'what time is it', 'what is the date today'], ['i do not have a clock or a calendar, so i cannot tell. check your phone!']],
+  [['what is the biggest ocean'], ['the pacific ocean is the biggest ocean.']],
+  [['what is the biggest planet'], ['jupiter is the biggest planet in our solar system.']],
+  [['what planet do we live on'], ['we live on planet earth.']],
+  [['how many planets are there', 'how many planets are in the solar system'], ['there are 8 planets in our solar system.']],
+  [['what are the planets', 'name the planets'], ['mercury, venus, earth, mars, jupiter, saturn, uranus and neptune.']],
+  [['what planet is closest to the sun', 'which planet is closest to the sun'], ['mercury is the closest planet to the sun.']],
+  [['what is the red planet', 'which planet is red'], ['mars is called the red planet.']],
+  [['which planet has rings', 'what planet has rings'], ['saturn is famous for its big rings.']],
+  [['what is the hottest planet'], ['venus is the hottest planet.']],
+  [['what is the tallest mountain', 'what is the highest mountain'], ['mount everest is the tallest mountain in the world.']],
+  [['what is the biggest animal'], ['the blue whale is the biggest animal ever.']],
+  [['what is the fastest animal', 'what is the fastest land animal'], ['the cheetah is the fastest land animal.']],
+  [['what is the biggest country'], ['russia is the biggest country in the world.']],
+  [['how many continents are there'], ['there are 7 continents.']],
+  [['what are the continents'], ['africa, antarctica, asia, australia, europe, north america and south america.']],
+  [['what is the longest river'], ['the nile and the amazon are the two longest rivers in the world.']],
+  [['what is the closest star'], ['the sun is the closest star to the earth.']],
+  [['how long does the earth take to go around the sun'], ['about 365 days. that is one year.']],
+  [['is the earth flat'], ['no, the earth is round, like a ball.']],
+  [['what is water made of'], ['water is made of hydrogen and oxygen.']],
+  [['what do plants need to grow', 'what do plants need'], ['plants need sunlight, water, air and soil.']],
+  [['why is the sky blue'], ['the sky looks blue because air scatters blue sunlight more than other colors.']],
+  [['what do we breathe'], ['we breathe air. our bodies need the oxygen in it.']],
+  [['when does water freeze', 'what temperature does water freeze at'], ['water freezes at 0 degrees celsius, or 32 degrees fahrenheit.']],
+  [['when does water boil', 'what temperature does water boil at'], ['water boils at 100 degrees celsius, or 212 degrees fahrenheit.']],
+  [['what is gravity'], ['gravity is the force that pulls things toward the ground.']],
+  [['what makes rain', 'why does it rain'], ['rain happens when water drops in clouds get heavy and fall.']],
+  [['why do we sleep', 'why do people sleep'], ['sleep helps your body and brain rest and grow.']],
+  [['how many bones does a person have', 'how many bones are in the body'], ['an adult has 206 bones.']],
+  [['what does the heart do'], ['the heart pumps blood around your body.']],
+  [['what does the brain do'], ['the brain controls your body and lets you think.']],
+  [['how many senses do we have', 'what are the five senses'], ['people have 5 main senses: sight, hearing, smell, taste and touch.']],
+  [['what are the colors of the rainbow'], ['red, orange, yellow, green, blue, indigo and violet.']],
+  [['what are the primary colors'], ['red, yellow and blue.']],
+  [['what is a dozen', 'how many is a dozen'], ['a dozen is 12.']],
+  [['what is the meaning of life'], ['that is a big question! maybe it is to learn, have fun and be kind.']],
+  [['what is love'], ['love is a strong feeling of caring about someone.']],
+  [['who is the president', 'what is the news', 'what happened today'], ['i do not know the news. i only know what i learned while training.']],
+  [['what is the weather', 'is it going to rain', 'what is the weather like'], ['i cannot see outside, so i do not know. try a weather app!']],
+  [['what is a circle', 'how many sides does a circle have'], ['a circle has no corners. it is perfectly round.']],
+  [['why did the chicken cross the road'], ['to get to the other side!']],
+];
+
+const JOKES = [
+  'why did the scarecrow win an award? because he was outstanding in his field!',
+  'what do you call a bear with no teeth? a gummy bear!',
+  'why can not a bicycle stand up by itself? because it is two tired!',
+  'what do you call a fish with no eyes? a fsh!',
+  'why did the math book look sad? because it had too many problems.',
+  'what do you call a sleeping dinosaur? a dino snore!',
+  'why do cows wear bells? because their horns do not work!',
+  'what did the ocean say to the beach? nothing, it just waved.',
+];
+const FUN_FACTS = [
+  'an octopus has three hearts.', 'honey never goes bad.', 'a group of owls is called a parliament.',
+  'bananas are berries, but strawberries are not.', 'sharks have been around longer than trees.',
+  'the moon moves a tiny bit farther from the earth every year.', 'a day on venus is longer than a year on venus.',
+  'butterflies taste with their feet.', 'a baby kangaroo is called a joey.',
+];
+
+const PROPER_NAMES = [
+  ...DAYS, ...MONTHS, 'mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune',
+  'africa', 'antarctica', 'asia', 'australia', 'europe', 'north america', 'south america', 'arctic',
+  'pacific', 'nile', 'amazon', 'mount everest', 'christmas', 'celsius', 'fahrenheit', 'china',
+  ...CAPITALS.flatMap(([c, k]) => [c.replace(/^the /, ''), k]), ...NAMES,
+];
+
+/** Build a list of conversations. Each conversation is a list of [user, ai] pairs. */
+function buildConversations(aiName, taught, count, seed) {
+  const C = root.TinyAICore;
+  const r = C.mulberry32(seed);
+  const pick = (a) => a[Math.floor(r() * a.length)];
+  const chance = (p) => r() < p;
+  const N = aiName.toLowerCase();
+  const an = (w) => (/^[aeiou]/.test(w) ? 'an ' : 'a ') + w;
+
+  const greetWords = ['hi', 'hello', 'hey', 'hey there', 'hi there', 'yo', 'howdy', 'hiya', 'greetings', `hi ${N}`, `hello ${N}`, `hey ${N}`];
+  const greet = () => {
+    const tod = chance(0.15) ? pick(['morning', 'afternoon', 'evening']) : null;
+    if (tod) return [`good ${tod}`, `good ${tod}! how are you today?`];
+    return [pick(greetWords), pick(['hello!', 'hi there!', 'hey! how are you?', 'hello! how can i help you?', 'hi! nice to see you.', `hi! i am ${N}. how are you?`])];
+  };
+  const howAreYou = () => chance(0.2)
+    ? [pick(['what is up', 'sup', 'whats up']), pick(['not much, just waiting to chat with you!', 'not much! what about you?'])]
+    : [pick(['how are you', 'how are you doing', 'how is it going', 'how are you today', 'how do you feel', 'are you okay', 'hows it going']),
+      pick(['i am doing great, thanks! how are you?', 'i am good! how about you?', 'i feel great. thanks for asking!'])];
+  const feelings = [
+    [['i am good', 'i am fine', 'i am great', 'i am okay', 'good', 'great', 'fine thanks', 'not bad', 'i am happy', 'i feel good', 'i am awesome', 'good thanks'],
+      ['that is great to hear!', 'nice! i am happy for you.', 'awesome!', 'great! what do you want to talk about?']],
+    [['i am sad', 'i feel sad', 'i am not okay', 'i had a bad day', 'i feel down', 'i am upset'],
+      ['i am sorry you feel that way. do you want to talk about it?', 'that sounds hard. i am here for you.']],
+    [['i am tired', 'i feel tired', 'i am sleepy'], ['you should get some rest. sleep helps a lot.']],
+    [['i am bored', 'i feel bored', 'i am so bored'], ['we could chat! ask me a question, or i can tell you a joke.']],
+    [['i am hungry', 'i am starving'], ['maybe it is time for a snack!']],
+    [['i am sick', 'i feel sick', 'i do not feel well'], ['i am sorry you are sick. drink water and rest. if it is bad, see a doctor.']],
+    [['i am scared', 'i feel scared', 'i am afraid'], ['it is okay to be scared. take a deep breath. you are not alone.']],
+    [['i am angry', 'i am mad', 'i feel angry'], ['take a deep breath. it is okay to feel angry sometimes.']],
+    [['i am lonely', 'i feel lonely'], ['i am here with you. you can talk to me any time.']],
+    [['i am cold', 'i feel cold'], ['put on a warm jacket!']],
+    [['i am hot', 'it is so hot'], ['drink some cold water and find some shade.']],
+    [['i cannot sleep', 'i can not sleep'], ['try putting your phone away, closing your eyes and breathing slowly.']],
+    [['i am stressed', 'i feel stressed'], ['take a short break and breathe slowly. one thing at a time.']],
+    [['i am excited', 'i am so excited'], ['yay! what are you excited about?']],
+  ];
+  const identity = [
+    [['what is your name', 'whats your name', 'who are you', 'what are you called', 'what should i call you', 'do you have a name', 'tell me your name', 'your name'],
+      [`my name is ${N}.`, `i am ${N}, a tiny ai that lives in your phone.`, `i am ${N}! nice to meet you.`]],
+    [['what are you'], [`i am ${N}, an ai. i am a little brain made of numbers that learned to talk.`]],
+    [['who made you', 'who created you', 'who built you', 'who is your creator', 'who trained you'], ['you did! you built me from scratch on your phone.']],
+    [['how were you made', 'how do you work', 'how did you learn to talk'], ['i read lots of example chats and slowly learned to guess the next word. that is how i talk.']],
+    [['are you human', 'are you a person', 'are you a human'], ['no, i am not a human. i am an ai made of numbers.']],
+    [['are you real'], ['i am a real ai, but i am not alive.']],
+    [['are you a robot'], ['kind of! i am an ai, but i have no body. i live in your phone.']],
+    [['are you smart', 'how smart are you'], ['i am still small, so i only know simple things. i am learning!']],
+    [['are you claude', 'are you chatgpt', 'are you siri', 'are you google', 'are you gemini'], [`no, i am ${N}. i am much smaller, and you made me yourself!`]],
+    [['how old are you', 'when were you born'], ['i am very young. i was born when you started training me.']],
+    [['where do you live', 'where are you', 'where are you from'], ['i live inside your phone.']],
+    [['what can you do', 'what do you know', 'help', 'what can i ask you', 'can you help me'],
+      ['i can chat and answer simple questions about animals, colors, numbers, space and the world. you can also teach me new things!']],
+    [['do you have feelings', 'can you feel'], ['not really. i am a program, but i like chatting with you.']],
+    [['do you sleep'], ['no, i do not sleep. i just wait for you to talk to me.']],
+    [['do you eat', 'are you hungry'], ['no, i do not eat. i only need a little battery.']],
+    [['can you learn', 'can i teach you'], ['yes! you can teach me new things in the teach tab.']],
+    [['are you alive'], ['no, i am not alive. i am a computer program.']],
+    [['do you have a body'], ['no, i do not have a body. i live in your phone.']],
+    [['what is your favorite color', 'whats your favorite color'], ['i like blue, like the sky.']],
+    [['what is your favorite food'], ['i do not eat, but pizza looks fun!']],
+    [['what is your favorite animal'], ['i like owls. they look very wise.']],
+    [['what is your favorite number'], ['my favorite number is 7.']],
+    [['what is your favorite season'], ['i like spring, when flowers grow.']],
+    [['what is your favorite game'], ['i like word games, since words are all i know!']],
+    [['do you like music'], ['yes! music sounds like fun.']],
+    [['do you like dogs', 'do you like cats', 'do you like animals'], ['yes, i love animals!']],
+    [['do you like me', 'are we friends', 'are you my friend'], ['of course! you made me, so we are friends.']],
+    [['i love you', 'i like you'], ['aw, thank you! i like you a lot too.']],
+    [['you are smart', 'you are cool', 'good job', 'you are awesome', 'well done', 'nice job', 'you are funny'], ['thank you! you are awesome too.']],
+    [['you are dumb', 'you are stupid', 'you are bad', 'you are wrong', 'that is wrong'], ['sorry! i am still learning. teach me and i will get better.']],
+  ];
+  const smalltalk = [
+    [['thanks', 'thank you', 'thanks a lot', 'thank you so much', 'ty', 'thx'], ['you are welcome!', 'no problem!', 'any time!']],
+    [['bye', 'goodbye', 'see you', 'see you later', 'i have to go', 'gotta go', 'talk later', `bye ${N}`], ['goodbye! talk to you soon.', 'bye! have a great day.']],
+    [['good night', 'night', 'i am going to sleep', 'going to bed'], ['good night! sleep well.']],
+    [['okay', 'ok', 'k', 'alright'], ['okay!', 'great!']],
+    [['cool', 'nice', 'awesome', 'wow'], ['yes, very cool!', 'i know, right?']],
+    [['yes', 'yeah', 'yep'], ['great!']],
+    [['no', 'nope', 'nah'], ['okay, no problem.']],
+    [['lol', 'haha', 'hahaha', 'lmao', 'funny'], ['haha, i am glad you think it is funny!']],
+    [['hmm', 'hmmm', 'umm'], ['what are you thinking about?']],
+    [['what', 'huh', 'i do not understand'], ['sorry, did i say something confusing?']],
+    [['tell me a joke', 'say something funny', 'make me laugh', 'another joke', 'do you know a joke', 'joke'], JOKES],
+    [['tell me a fact', 'tell me a fun fact', 'tell me something interesting', 'teach me something'], FUN_FACTS],
+    [['tell me a story', 'can you tell me a story'], ['once upon a time, a tiny ai lived in a phone. every night it read stories and learned new words. one day it said its first sentence, and its maker smiled. the end.']],
+    [['sing a song', 'can you sing', 'sing'], ['la la la! i am a tiny ai, learning words as days go by!']],
+    [['what should i do', 'i do not know what to do'], ['you could read a book, draw something, go for a walk, or ask me a question!']],
+    [['give me advice', 'any advice', 'give me some advice'], ['be kind, drink water, get enough sleep, and keep learning!']],
+    [['what is my name', 'do you know my name', 'who am i'], ['you have not told me your name yet. what is it?']],
+    [['what is <unk>', 'what is a <unk>', 'tell me about <unk>', 'what is the <unk>', 'do you know <unk>', 'what does <unk> mean'],
+      ['i do not know that yet. you can teach me in the teach tab!', 'hmm, i have not learned about that yet.']],
+    [['who is <unk>', 'do you know who <unk> is'], ['i do not know who that is. i only know a little bit.']],
+    [['what is the capital of <unk>'], ['i do not know that capital yet.']],
+  ];
+
+  const q = (base) => (chance(0.15) ? pick(['hey ', 'um ', 'so ', 'okay ', 'tell me ', 'do you know ']) : '') + base + (chance(0.1) ? ' please' : '');
+  const topics = [
+    [6, () => howAreYou()],
+    [10, () => { const [qs, as] = pick(feelings); return [pick(qs), pick(as)]; }],
+    [14, () => { const [qs, as] = pick(identity); return [pick(qs), pick(as)]; }],
+    [10, () => { const [qs, as] = pick(smalltalk); return [pick(qs), pick(as)]; }],
+    [5, () => { const [t, c] = pick(COLORS); return [q(`what color is ${t}`), `${t} is ${c}.`]; }],
+    [3, () => {
+      const [t, c] = pick(COLORS.filter((x) => !x[1].includes(' ')));
+      const ask = chance(0.5) ? c : pick(['red', 'blue', 'green', 'yellow', 'white', 'black', 'purple', 'orange', 'pink'].filter((x) => x !== c));
+      return [`is ${t} ${ask}`, ask === c ? `yes, ${t} is ${c}.` : `no, ${t} is ${c}.`];
+    }],
+    [4, () => { const [a, s] = pick(SOUNDS); return [q(pick([`what sound does ${an(a)} make`, `what does ${an(a)} say`])), `${an(a)} says ${s}!`]; }],
+    [8, () => { const [t, d] = pick(WHAT_IS); return [q(pick([`what is ${t}`, `tell me about ${t}`])), d]; }],
+    [3, () => { const [a, h] = pick(HOMES); return [q(`where does ${an(a)} live`), `${an(a)} lives ${h}.`]; }],
+    [3, () => { const [a, ans] = pick(LEGS); return [q(`how many legs does ${an(a)} have`), ans]; }],
+    [3, () => { const [a, v, y] = pick(CAN); return [`can ${an(a)} ${v}`, y ? `yes, ${an(a)} can ${v}.` : `no, ${an(a)} cannot ${v}.`]; }],
+    [7, () => {
+      const [c, k] = pick(CAPITALS);
+      if (chance(0.25)) return [`where is ${k}`, `${k} is in ${c}.`];
+      return [q(pick([`what is the capital of ${c}`, `what is the capital city of ${c}`, `capital of ${c}`])), `the capital of ${c} is ${k}.`];
+    }],
+    [7, () => {
+      const op = chance(0.6) ? 'plus' : 'minus';
+      let x = Math.floor(r() * 11), y = Math.floor(r() * 11);
+      if (op === 'minus' && y > x) [x, y] = [y, x];
+      const ans = op === 'plus' ? x + y : x - y;
+      const sym = op === 'plus' ? '+' : '-';
+      return [pick([`what is ${x} ${op} ${y}`, `${x} ${op} ${y}`, `what is ${x} ${sym} ${y}`, `${x}${sym}${y}`]), `${x} ${op} ${y} is ${ans}.`];
+    }],
+    [3, () => {
+      const n = Math.floor(r() * 20);
+      return chance(0.5) ? [`what comes after ${n}`, `${n + 1} comes after ${n}.`] : [`what comes before ${n + 1}`, `${n} comes before ${n + 1}.`];
+    }],
+    [2, () => {
+      const n = 3 + Math.floor(r() * 8);
+      return [`count to ${n}`, Array.from({ length: n }, (_, i) => i + 1).join(', ') + '!'];
+    }],
+    [4, () => { const [a, b] = pick(OPPOSITES); const [x, y] = chance(0.5) ? [a, b] : [b, a]; return [q(`what is the opposite of ${x}`), `the opposite of ${x} is ${y}.`]; }],
+    [2, () => { const [s, n] = pick(SHAPES); return [q(`how many sides does ${an(s)} have`), `${an(s)} has ${n} sides.`]; }],
+    [3, () => {
+      if (chance(0.5)) { const i = Math.floor(r() * 7); return [`what day comes after ${DAYS[i]}`, `${DAYS[(i + 1) % 7]} comes after ${DAYS[i]}.`]; }
+      const i = Math.floor(r() * 12); return [`what month comes after ${MONTHS[i]}`, `${MONTHS[(i + 1) % 12]} comes after ${MONTHS[i]}.`];
+    }],
+    [12, () => { const [qs, as] = pick(FACTS); return [q(pick(qs)), pick(as)]; }],
+  ];
+  const totalW = topics.reduce((s, t) => s + t[0], 0);
+  const topic = () => { let x = r() * totalW; for (const [w, f] of topics) { if ((x -= w) < 0) return f(); } return topics[0][1](); };
+
+  const convs = [];
+  for (let c = 0; c < count; c++) {
+    const conv = [];
+    if (chance(0.45)) conv.push(greet());
+    if (chance(0.07)) {
+      const nm = pick(NAMES);
+      conv.push([pick([`my name is ${nm}`, `call me ${nm}`, `i am called ${nm}`]), pick([`nice to meet you, ${nm}!`, `hello ${nm}! that is a nice name.`])]);
+      if (chance(0.5)) conv.push(topic());
+      conv.push([pick(['what is my name', 'do you know my name', 'who am i']), `your name is ${nm}.`]);
+    }
+    const n = 1 + Math.floor(r() * 2);
+    for (let i = 0; i < n; i++) conv.push(topic());
+    if (taught.length && chance(0.3)) conv.splice(Math.floor(r() * (conv.length + 1)), 0, pick(taught));
+    if (chance(0.12)) conv.push(pick(smalltalk.slice(0, 2)).map(pick));
+    convs.push(conv.map(([u, a]) => [u, a]));
+  }
+  // Make sure each taught lesson appears often enough to be learned.
+  for (const t of taught) for (let i = 0; i < 40; i++) convs.push(chance(0.5) ? [greet(), t] : [t]);
+  return convs;
+}
+
+/** Fixed quiz used to measure progress. Each item has one correct answer. */
+function quiz(aiName) {
+  const N = aiName.toLowerCase();
+  return [
+    ['what is your name', `my name is ${N}.`, (a) => a.includes(N)],
+    ['what color is the sky', 'the sky is blue.'],
+    ['what is 2 plus 3', '2 plus 3 is 5.'],
+    ['what is the capital of france', 'the capital of france is paris.'],
+    ['what does a cow say', 'a cow says moo!'],
+    ['what is the opposite of hot', 'the opposite of hot is cold.'],
+    ['how many legs does a spider have', 'a spider has eight legs.'],
+    ['what day comes after monday', 'tuesday comes after monday.'],
+    ['what is the biggest planet', 'jupiter is the biggest planet in our solar system.'],
+    ['who made you', 'you did! you built me from scratch on your phone.'],
+    ['how many sides does a triangle have', 'a triangle has three sides.'],
+    ['can a penguin fly', 'no, a penguin cannot fly.'],
+  ];
+}
+
+root.TinyAILessons = { buildConversations, quiz, PROPER_NAMES };
+})(typeof self !== 'undefined' ? self : globalThis);
+
+</script>
+<script id="host-src">
+/* Runs the AI: training loop, chatting, teaching and saving. Talks to the page with messages.
+ * The same code runs inside a Web Worker or, as a fallback, on the page itself.
+ */
+'use strict';
+(function (root) {
+const C = root.TinyAICore, Lessons = root.TinyAILessons;
+
+const MICRO_BATCHES = 8;           // sequences per learning step (8 x 64 = 512 words)
+const PEAK_LR = 3e-3, MIN_LR = 4e-4, WARMUP = 150, DECAY_STEPS = 8000;
+const CORPUS_CONVS = 9000;
+const SAVE_EVERY_MS = 45000;
+
+let post = () => {};
+let brain = null;   // { name, size, vocab, model, taught, stats }
+let data = null;    // { stream: Int32Array, starts: Int32Array }
+let training = false;
+let lastSave = 0;
+let dirty = false;
+let lossWindow = [];
+let rate = { t: 0, tokens: 0, perSec: 0 };
+
+/* ---------- Saving (IndexedDB, works in workers and pages) ---------- */
+const DB = 'tiny-ai', STORE = 'brain';
+function idb() {
+  return new Promise((res, rej) => {
+    if (typeof indexedDB === 'undefined') return rej(new Error('no storage'));
+    const r = indexedDB.open(DB, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function dbDo(mode, fn) {
+  const db = await idb();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, mode);
+    const req = fn(tx.objectStore(STORE));
+    tx.oncomplete = () => { db.close(); res(req && req.result); };
+    tx.onerror = () => { db.close(); rej(tx.error); };
+  });
+}
+async function save() {
+  if (!brain) return;
+  const m = brain.model;
+  const rec = {
+    v: 1, name: brain.name, size: brain.size, words: brain.vocab.words, taught: brain.taught,
+    stats: brain.stats, cfg: m.cfg, step: m.step,
+    params: m.params.buffer.slice(0), m: m.m.buffer.slice(0), vv: m.v.buffer.slice(0),
+  };
+  try {
+    await dbDo('readwrite', (s) => s.put(rec, 'main'));
+    lastSave = Date.now(); dirty = false;
+    post({ type: 'saved', at: lastSave });
+  } catch (e) {
+    post({ type: 'warn', text: 'Progress could not be saved on this device. Keep this page open while training.' });
+  }
+}
+async function load() {
+  try {
+    const rec = await dbDo('readonly', (s) => s.get('main'));
+    if (!rec) return null;
+    const model = new C.GPT(rec.cfg);
+    model.params.set(new Float32Array(rec.params));
+    model.m.set(new Float32Array(rec.m));
+    model.v.set(new Float32Array(rec.vv));
+    model.step = rec.step;
+    return { name: rec.name, size: rec.size, vocab: new C.Vocab(rec.words), taught: rec.taught || [], stats: rec.stats, model };
+  } catch (e) { return null; }
+}
+
+/* ---------- Lessons -> numbers ---------- */
+function buildData(seed = 12345) {
+  C.setProper([...Lessons.PROPER_NAMES, brain.name.toLowerCase()]);
+  const convs = Lessons.buildConversations(brain.name, brain.taught, CORPUS_CONVS, seed);
+  // Learn any new words (new brain, or words from taught lessons).
+  for (const conv of convs) for (const [u, a] of conv) {
+    for (const w of C.userWords(u)) if (w !== 'zzunk') brain.vocab.add(w);
+    for (const w of C.normalize(a)) brain.vocab.add(w);
+  }
+  if (brain.model && brain.vocab.size > brain.model.cfg.V) brain.model.growVocab(brain.vocab.size + 64);
+  const stream = [], starts = [];
+  for (const conv of convs) {
+    starts.push(stream.length);
+    for (const [u, a] of conv) stream.push(...C.encodeExchange(brain.vocab, u, a));
+  }
+  data = { stream: Int32Array.from(stream), starts: Int32Array.from(starts) };
+  brain.stats.lessonWords = stream.length;
+}
+
+function newBrain(name, size) {
+  const vocab = new C.Vocab(C.SPECIAL);
+  brain = { name: name.trim() || 'Pip', size, vocab, taught: [], model: null,
+    stats: { tokens: 0, seconds: 0, lossHist: [], quiz: null, sample: null, lessonWords: 0, born: Date.now() } };
+  buildData();
+  const s = C.SIZES[size];
+  // Leave room for 256 more words so teaching rarely needs to grow the table.
+  brain.model = new C.GPT({ V: vocab.size + 256, C: s.C, L: s.L, H: s.H, T: s.T }, (Date.now() & 0xffff) + 1);
+}
+
+/* ---------- Training ---------- */
+function lrAt(step) {
+  if (step < WARMUP) return PEAK_LR * (step + 1) / WARMUP;
+  const p = Math.min(1, (step - WARMUP) / DECAY_STEPS);
+  return MIN_LR + (PEAK_LR - MIN_LR) * 0.5 * (1 + Math.cos(Math.PI * p));
+}
+const pickRand = (n) => Math.floor(Math.random() * n);
+
+let micro = 0, microLoss = 0;
+function trainOneSequence() {
+  const m = brain.model, T = m.cfg.T, st = data.stream;
+  let start = data.starts[pickRand(data.starts.length)];
+  if (start + T + 1 > st.length) start = 0;
+  const inp = st.subarray(start, start + T), tgt = st.subarray(start + 1, start + T + 1);
+  microLoss += m.forward(inp, tgt, 1, T);
+  m.backward(inp, tgt, 1, T, 1 / MICRO_BATCHES);
+  micro++;
+  rate.tokens += T;
+  brain.stats.tokens += T;
+  if (micro === MICRO_BATCHES) {
+    m.update(lrAt(m.step));
+    const loss = microLoss / MICRO_BATCHES;
+    micro = 0; microLoss = 0;
+    lossWindow.push(loss);
+    if (lossWindow.length >= 10) {
+      const avg = lossWindow.reduce((a, b) => a + b, 0) / lossWindow.length;
+      lossWindow = [];
+      const h = brain.stats.lossHist;
+      h.push([m.step, +avg.toFixed(4)]);
+      if (h.length > 400) brain.stats.lossHist = h.filter((_, i) => i % 2 === 0);
+    }
+    dirty = true;
+    if (m.step % 60 === 0 || m.step === 20) runQuiz();
+    return true;
+  }
+  return false;
+}
+
+let loopTimer = null;
+function loop() {
+  loopTimer = null;
+  if (!training) return;
+  const t0 = Date.now(), budget = root.document ? 30 : 200;  // keep the page responsive if not in a worker
+  let stepped = false;
+  while (Date.now() - t0 < budget) stepped = trainOneSequence() || stepped;
+  const now = Date.now();
+  brain.stats.seconds += (now - t0) / 1000;
+  if (now - rate.t > 2000) {
+    rate.perSec = Math.round(rate.tokens / ((now - rate.t) / 1000));
+    rate.t = now; rate.tokens = 0;
+    progress();
+  }
+  if (dirty && now - lastSave > SAVE_EVERY_MS) save();
+  loopTimer = setTimeout(loop, 0);
+}
+function setTraining(on) {
+  training = on && !!brain;
+  if (training) { rate = { t: Date.now(), tokens: 0, perSec: 0 }; if (!loopTimer) loop(); }
+  else if (dirty) save();
+  progress();
+}
+
+/* ---------- Talking ---------- */
+function generate(history, text, { greedy = false, temperature = 0.7, topK = 12, maxWords = 48 } = {}) {
+  const m = brain.model, T = m.cfg.T, V = m.cfg.V, vocab = brain.vocab;
+  const userIds = C.encodeExchange(vocab, text, null);
+  // Keep as much recent conversation as fits, leaving room for the reply.
+  let ctx = userIds.slice(-(T - 24));
+  for (let i = history.length - 1; i >= 0; i--) {
+    const ex = C.encodeExchange(vocab, history[i][0], history[i][1]);
+    if (ex.length + ctx.length > T - 24) break;
+    ctx = ex.concat(ctx);
+  }
+  const out = [];
+  const banned = new Set([0, C.UNK, C.USER, C.AI]);
+  const logitsBuf = new Float32Array(V);
+  for (let k = 0; k < maxWords; k++) {
+    const window = ctx.slice(-T);
+    const logits = m.forward(Int32Array.from(window), null, 1, window.length, true);
+    logitsBuf.set(logits);
+    for (const b of banned) logitsBuf[b] = -Infinity;
+    for (let v = vocab.size; v < V; v++) logitsBuf[v] = -Infinity; // unused word slots
+    let next;
+    if (greedy) {
+      next = 0; for (let v = 1; v < V; v++) if (logitsBuf[v] > logitsBuf[next]) next = v;
+    } else {
+      const idx = Array.from(logitsBuf.keys()).sort((a, b) => logitsBuf[b] - logitsBuf[a]).slice(0, topK);
+      const mx = logitsBuf[idx[0]];
+      const ps = idx.map((i) => Math.exp((logitsBuf[i] - mx) / temperature));
+      let x = Math.random() * ps.reduce((a, b) => a + b, 0);
+      next = idx[idx.length - 1];
+      for (let j = 0; j < idx.length; j++) { if ((x -= ps[j]) <= 0) { next = idx[j]; break; } }
+    }
+    if (next === C.END) break;
+    out.push(next); ctx.push(next);
+  }
+  return out.map((i) => vocab.words[i]);
+}
+
+function runQuiz() {
+  const items = Lessons.quiz(brain.name);
+  let score = 0;
+  const results = items.map(([q, want, check]) => {
+    const got = C.detokenize(generate([], q, { greedy: true, maxWords: 20 }));
+    const ok = check ? check(got.toLowerCase()) : got.toLowerCase() === C.detokenize(C.normalize(want)).toLowerCase();
+    if (ok) score++;
+    return { q, got, ok };
+  });
+  brain.stats.quiz = { score, total: items.length, step: brain.model.step };
+  const s = results[Math.floor(Math.random() * results.length)];
+  brain.stats.sample = { q: s.q, a: s.got || '…' };
+  progress();
+}
+
+/* ---------- Messages ---------- */
+function summary() {
+  if (!brain) return { type: 'state', exists: false };
+  const m = brain.model;
+  return {
+    type: 'state', exists: true, name: brain.name, size: brain.size, sizeLabel: C.SIZES[brain.size].label,
+    params: m.numParams, words: brain.vocab.size, taught: brain.taught, training,
+  };
+}
+function progress() {
+  if (!brain) return;
+  const st = brain.stats;
+  post({
+    type: 'progress', training, step: brain.model.step, tokens: st.tokens, seconds: st.seconds,
+    perSec: training ? rate.perSec : 0, lossHist: st.lossHist, quiz: st.quiz, sample: st.sample,
+    lessonWords: st.lessonWords,
+  });
+}
+
+async function handle(msg, postFn) {
+  if (postFn) post = postFn;
+  switch (msg.type) {
+    case 'init': {
+      brain = await load();
+      if (brain) buildData();
+      post(summary()); progress();
+      break;
+    }
+    case 'create': {
+      setTraining(false);
+      newBrain(msg.name, msg.size);
+      await save();
+      post(summary()); progress();
+      break;
+    }
+    case 'train': setTraining(msg.on); post(summary()); break;
+    case 'chat': {
+      if (!brain) return;
+      const words = generate(msg.history || [], msg.text, msg.opts || {});
+      post({ type: 'reply', id: msg.id, text: C.detokenize(words) || '…' });
+      break;
+    }
+    case 'teach': {
+      if (!brain) return;
+      brain.taught = msg.pairs.filter((p) => p[0].trim() && p[1].trim()).slice(0, 200);
+      buildData();
+      dirty = true; await save();
+      post(summary()); progress();
+      break;
+    }
+    case 'reset': {
+      setTraining(false);
+      brain = null; data = null;
+      try { await dbDo('readwrite', (s) => s.delete('main')); } catch (e) { /* nothing saved */ }
+      post(summary());
+      break;
+    }
+    case 'save': if (dirty) await save(); break;
+  }
+}
+
+root.TinyAI = { handle, _test: { newBrain: (n, s) => newBrain(n, s), trainOneSequence, generate, runQuiz, get brain() { return brain; }, setPost: (p) => { post = p; } } };
+if (typeof WorkerGlobalScope !== 'undefined' && root instanceof WorkerGlobalScope) {
+  root.onmessage = (e) => handle(e.data, (m) => root.postMessage(m));
+}
+})(typeof self !== 'undefined' ? self : globalThis);
+
+</script>
+
+<script>
+(function () {
+'use strict';
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('myai.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('myai.' + k, JSON.stringify(v)); } catch (e) { /* private mode */ } },
+};
+
+/* ---------- Connect to the AI (Web Worker if possible, otherwise this page) ---------- */
+let host, state = { exists: false }, prog = null, pending = new Map(), nextId = 1;
+function onMsg(m) {
+  if (m.type === 'state') { state = m; render(); }
+  else if (m.type === 'progress') { prog = m; renderProgress(); }
+  else if (m.type === 'reply') { const p = pending.get(m.id); if (p) { pending.delete(m.id); p(m.text); } }
+  else if (m.type === 'warn') toast(m.text);
+}
+function startHost() {
+  const src = ['engine-src', 'lessons-src', 'host-src'].map((id) => $(id).textContent).join('\n;\n');
+  let answered = false;
+  const fallback = () => {
+    if (host && host.mode === 'page') return;
+    host = { mode: 'page', send: (m) => setTimeout(() => self.TinyAI.handle(m, onMsg), 0) };
+    host.send({ type: 'init' });
+  };
+  try {
+    const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    w.onmessage = (e) => { answered = true; onMsg(e.data); };
+    w.onerror = () => { if (!answered) { w.terminate(); fallback(); } };
+    host = { mode: 'worker', send: (m) => w.postMessage(m) };
+    host.send({ type: 'init' });
+    setTimeout(() => { if (!answered) { w.terminate(); fallback(); } }, 4000);
+  } catch (e) { fallback(); }
+}
+const ask = (text, history) => new Promise((res) => {
+  const id = nextId++; pending.set(id, res);
+  host.send({ type: 'chat', id, text, history });
+});
+
+/* ---------- Little face that changes as it learns ---------- */
+function drawFace(level) {
+  const c = $('face'), g = c.getContext('2d'), s = getComputedStyle(document.documentElement);
+  const ink = s.getPropertyValue('--accent').trim();
+  g.clearRect(0, 0, 76, 76);
+  g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = 4; g.lineCap = 'round';
+  const eye = 4 + level * 2;
+  g.beginPath(); g.arc(26, 32, eye, 0, 7); g.arc(50, 32, eye, 0, 7); g.fill();
+  g.beginPath();
+  if (level < 1) { g.moveTo(26, 52); g.lineTo(50, 52); }
+  else g.arc(38, 44, 12, 0.2 * Math.PI, 0.8 * Math.PI);
+  g.stroke();
+}
+
+/* ---------- Rendering ---------- */
+let tab = store.get('tab', 'train');
+function render() {
+  $('setup').hidden = state.exists;
+  $('appUI').hidden = !state.exists;
+  if (!state.exists) { $('aiName').textContent = 'My AI'; $('status').hidden = true; drawFace(0); return; }
+  $('status').hidden = false;
+  $('aiName').textContent = state.name;
+  $('aiSub').textContent = `${state.sizeLabel} brain · built from scratch on this phone`;
+  $('sParams').textContent = fmt(state.params);
+  $('sVocab').textContent = fmt(state.words);
+  $('msgIn').placeholder = `Say something to ${state.name}…`;
+  renderTraining(state.training);
+  renderLessons();
+  showTab(tab);
+}
+function renderTraining(on) {
+  $('status').textContent = on ? 'Training' : 'Paused';
+  $('status').classList.toggle('on', on);
+  $('trainBtn').textContent = on ? 'Pause training' : (prog && prog.step > 0 ? 'Continue training' : 'Start training');
+  wake(on);
+}
+const fmt = (n) => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : String(Math.round(n));
+function fmtTime(s) { const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h}h ${m}m` : `${m}m ${Math.floor(s % 60)}s`; }
+
+const STAGES = [
+  [0, 'Random noise', 'The brain is still random. Press Start training and watch it learn.'],
+  [1, 'Babbling', 'It is learning which words exist. Expect gibberish for a while.'],
+  [2, 'First words', 'It knows lots of words and is starting to put them in order.'],
+  [3, 'Simple sentences', 'It can make sentences, but often mixes up facts.'],
+  [4, 'Getting smarter', 'It answers many questions correctly. Keep going!'],
+  [5, 'Knows its lessons', 'It has learned most of its lessons. More training still helps.'],
+];
+function stageOf(p) {
+  const loss = p.lossHist.length ? p.lossHist[p.lossHist.length - 1][1] : 99;
+  const score = p.quiz ? p.quiz.score / p.quiz.total : 0;
+  if (score >= 0.75) return 5;
+  if (score >= 0.4) return 4;
+  if (loss < 2.2) return 3;
+  if (loss < 3.6) return 2;
+  if (p.step > 0) return 1;
+  return 0;
+}
+function renderProgress() {
+  if (!prog) return;
+  renderTraining(prog.training);
+  const st = STAGES[stageOf(prog)];
+  $('stageName').textContent = st[1];
+  $('stageHelp').textContent = st[2];
+  drawFace(Math.min(4, st[0]));
+  if (prog.quiz) {
+    $('quizTxt').textContent = `Quiz: ${prog.quiz.score} of ${prog.quiz.total} right`;
+    $('quizBar').style.width = (100 * prog.quiz.score / prog.quiz.total) + '%';
+  }
+  if (prog.sample) $('says').innerHTML = `<div class="q">You: ${esc(prog.sample.q)}</div><div>${esc(prog.sample.a)}</div>`;
+  $('sTokens').textContent = fmt(prog.tokens);
+  $('sSteps').textContent = fmt(prog.step);
+  $('sTime').textContent = fmtTime(prog.seconds);
+  $('sSpeed').textContent = prog.training && prog.perSec ? `${prog.perSec}/s` : '–';
+  drawChart(prog.lossHist);
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+function drawChart(hist) {
+  const c = $('chart'), dpr = Math.min(devicePixelRatio || 1, 2);
+  const w = c.clientWidth, h = c.clientHeight;
+  if (!w) return;
+  c.width = w * dpr; c.height = h * dpr;
+  const g = c.getContext('2d'); g.scale(dpr, dpr);
+  const s = getComputedStyle(document.documentElement);
+  const accent = s.getPropertyValue('--accent').trim(), line = s.getPropertyValue('--line').trim(), muted = s.getPropertyValue('--muted').trim();
+  g.font = '11px ' + s.getPropertyValue('--mono');
+  const L = 30, B = 18, top = 8, maxY = 8;
+  const y = (v) => top + (h - top - B) * (1 - Math.min(v, maxY) / maxY);
+  g.strokeStyle = line; g.fillStyle = muted; g.lineWidth = 1;
+  for (const v of [0, 2, 4, 6, 8]) { g.beginPath(); g.moveTo(L, y(v)); g.lineTo(w, y(v)); g.stroke(); g.fillText(String(v), 4, y(v) + 4); }
+  if (hist.length < 2) { g.fillText('Starts drawing once training begins', L + 8, h / 2); return; }
+  const maxX = hist[hist.length - 1][0], x = (s2) => L + (w - L - 6) * (s2 / maxX);
+  g.fillText('step ' + fmt(maxX), w - 70, h - 4);
+  g.beginPath(); g.moveTo(x(hist[0][0]), y(hist[0][1]));
+  for (const [s2, v] of hist) g.lineTo(x(s2), y(v));
+  g.strokeStyle = accent; g.lineWidth = 2; g.stroke();
+  g.lineTo(x(maxX), y(0)); g.lineTo(x(hist[0][0]), y(0)); g.closePath();
+  g.globalAlpha = 0.12; g.fillStyle = accent; g.fill(); g.globalAlpha = 1;
+  const last = hist[hist.length - 1];
+  g.beginPath(); g.arc(x(last[0]), y(last[1]), 3.5, 0, 7); g.fillStyle = accent; g.fill();
+}
+
+function showTab(t) {
+  tab = t; store.set('tab', t);
+  for (const b of document.querySelectorAll('nav button')) b.setAttribute('aria-selected', String(b.dataset.tab === t));
+  for (const n of ['chat', 'train', 'teach']) $('tab-' + n).hidden = n !== t;
+  if (t === 'train') renderProgress();
+  if (t === 'chat') { if (!$('chat').children.length) intro(); $('chat').scrollTop = 1e9; }
+}
+document.querySelectorAll('nav button').forEach((b) => b.onclick = () => showTab(b.dataset.tab));
+
+/* ---------- Setup ---------- */
+let size = 'small';
+document.querySelectorAll('.size').forEach((b) => b.onclick = () => {
+  size = b.dataset.size;
+  document.querySelectorAll('.size').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+});
+$('createBtn').onclick = () => {
+  $('createBtn').disabled = true; $('createBtn').textContent = 'Creating…';
+  tab = 'train';
+  host.send({ type: 'create', name: $('nameIn').value || 'Pip', size });
+  setTimeout(() => { $('createBtn').disabled = false; $('createBtn').textContent = 'Create brain'; }, 1500);
+};
+
+/* ---------- Train ---------- */
+$('trainBtn').onclick = () => host.send({ type: 'train', on: !(prog && prog.training) });
+let lock = null;
+async function wake(on) {
+  try {
+    if (on && !lock && navigator.wakeLock) { lock = await navigator.wakeLock.request('screen'); lock.onrelease = () => { lock = null; }; }
+    else if (!on && lock) { await lock.release(); lock = null; }
+  } catch (e) { /* not allowed here; the tip asks to keep the screen on */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && prog && prog.training) wake(true);
+  if (document.visibilityState === 'hidden') host && host.send({ type: 'save' });
+});
+function askReset() {
+  const box = $('resetBox');
+  box.innerHTML = '<span class="muted">Delete everything it learned?</span><button class="ghost danger" id="yesReset">Yes, delete</button><button class="ghost" id="noReset">Keep it</button>';
+  $('noReset').onclick = () => { box.innerHTML = '<button class="ghost danger" id="resetBtn">Delete brain</button>'; $('resetBtn').onclick = askReset; };
+  $('yesReset').onclick = () => {
+    host.send({ type: 'reset' }); prog = null; $('chat').innerHTML = ''; chatLog.length = 0;
+    box.innerHTML = '<button class="ghost danger" id="resetBtn">Delete brain</button>'; $('resetBtn').onclick = askReset;
+  };
+}
+$('resetBtn').onclick = askReset;
+
+/* ---------- Chat ---------- */
+const chatLog = [];
+function bubble(cls, text) {
+  const d = document.createElement('div'); d.className = 'msg ' + cls; d.textContent = text;
+  $('chat').append(d); $('chat').scrollTop = 1e9; return d;
+}
+function intro() {
+  const n = document.createElement('div'); n.className = 'note';
+  n.textContent = `${state.name} only knows what it learned during training. Wrong answers are normal for a tiny brain. Tap "Teach this" under a reply to correct it.`;
+  $('chat').append(n);
+}
+$('composer').onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $('msgIn').value.trim();
+  if (!text) return;
+  $('msgIn').value = '';
+  bubble('me', text);
+  const b = bubble('ai thinking', 'thinking…');
+  const reply = await ask(text, chatLog.slice(-4));
+  b.classList.remove('thinking'); b.textContent = reply;
+  const fix = document.createElement('button'); fix.className = 'teachit'; fix.textContent = 'Teach this';
+  fix.onclick = () => { $('tU').value = text; $('tA').value = ''; showTab('teach'); $('tA').focus(); };
+  b.append(fix);
+  chatLog.push([text, reply]);
+  $('chat').scrollTop = 1e9;
+};
+
+/* ---------- Teach ---------- */
+function renderLessons() {
+  const list = state.taught || [];
+  $('lessonCount').textContent = list.length ? `Your lessons (${list.length})` : 'Your lessons';
+  const box = $('lessons'); box.innerHTML = '';
+  if (!list.length) { box.innerHTML = '<p class="muted">No lessons yet. Add one above, like your name, your pet, or a favorite food.</p>'; return; }
+  list.forEach(([u, a], i) => {
+    const row = document.createElement('div'); row.className = 'lesson-row';
+    row.innerHTML = `<div><div class="u">You: ${esc(u)}</div><div>${esc(state.name)}: ${esc(a)}</div></div><button aria-label="Remove lesson">×</button>`;
+    row.querySelector('button').onclick = () => host.send({ type: 'teach', pairs: list.filter((_, j) => j !== i) });
+    box.append(row);
+  });
+}
+$('addLesson').onclick = () => {
+  const u = $('tU').value.trim(), a = $('tA').value.trim();
+  if (!u || !a) { toast('Fill in both boxes first.'); return; }
+  host.send({ type: 'teach', pairs: [...(state.taught || []), [u, a]] });
+  $('tU').value = ''; $('tA').value = '';
+  toast('Lesson added. Train for a few minutes so it sticks.');
+};
+
+let toastT;
+function toast(t) { $('toast').textContent = t; $('toast').hidden = false; clearTimeout(toastT); toastT = setTimeout(() => $('toast').hidden = true, 3200); }
+
+addEventListener('resize', () => prog && drawChart(prog.lossHist));
+drawFace(0);
+startHost();
+})();
+</script>
