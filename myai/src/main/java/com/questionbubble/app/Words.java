@@ -35,6 +35,10 @@ final class Words {
         for (int i = 0; i < pairs.length; i += 2) SHORT.put(pairs[i], pairs[i + 1]);
     }
 
+    private static final Pattern HI = Pattern.compile("hi+"), HEY = Pattern.compile("hey+"),
+            HAHA = Pattern.compile("(ha){2,}h?|(he){2,}"), HELLO = Pattern.compile("hel+o+"), NO = Pattern.compile("no+"),
+            YES = Pattern.compile("yes+"), LOL = Pattern.compile("(lol)+"), OKAY = Pattern.compile("okay+"),
+            QUOTES = Pattern.compile("^'+|'+$"), WORD = Pattern.compile("\\b[a-zA-Z]+\\b");
     private static final Pattern TOKEN = Pattern.compile("[a-z0-9']+|[.,!?]");
     private static final Pattern PLUS = Pattern.compile("(\\d)\\s*\\+\\s*(?=\\d)");
     private static final Pattern MINUS = Pattern.compile("(\\d)\\s*-\\s*(?=\\d)");
@@ -52,22 +56,26 @@ final class Words {
         List<String> out = new ArrayList<>();
         Matcher m = TOKEN.matcher(s);
         while (m.find()) {
-            String w = m.group().replaceAll("^'+|'+$", "");
+            String w = m.group();
+            if (w.indexOf('\'') >= 0) w = QUOTES.matcher(w).replaceAll("");
             if (w.isEmpty()) continue;
-            if (w.matches("hi+")) w = "hi";
-            else if (w.matches("hey+")) w = "hey";
-            else if (w.matches("(ha){2,}h?") || w.matches("(he){2,}")) w = "haha";
-            else if (w.matches("hel+o+")) w = "hello";
-            else if (w.matches("no+")) w = "no";
-            else if (w.matches("yes+")) w = "yes";
-            else if (w.matches("(lol)+")) w = "lol";
-            else if (w.matches("okay+")) w = "okay";
+            char f = w.charAt(0);
+            if (f == 'h' || f == 'n' || f == 'y' || f == 'l' || f == 'o') {
+                if (HI.matcher(w).matches()) w = "hi";
+                else if (HEY.matcher(w).matches()) w = "hey";
+                else if (HAHA.matcher(w).matches()) w = "haha";
+                else if (HELLO.matcher(w).matches()) w = "hello";
+                else if (NO.matcher(w).matches()) w = "no";
+                else if (YES.matcher(w).matches()) w = "yes";
+                else if (LOL.matcher(w).matches()) w = "lol";
+                else if (OKAY.matcher(w).matches()) w = "okay";
+            }
             String exp = SHORT.get(w);
             if (exp != null) {
                 for (String x : exp.split(" ")) out.add(x);
                 continue;
             }
-            w = w.replace("'", "");
+            if (w.indexOf('\'') >= 0) w = w.replace("'", "");
             if (w.isEmpty()) continue;
             if (isPunct(w) && !out.isEmpty() && isPunct(out.get(out.size() - 1))) continue;
             out.add(w);
@@ -148,7 +156,7 @@ final class Words {
             if (!s.contains(p)) continue;
             s = s.replaceAll("\\b" + Pattern.quote(p) + "\\b", Matcher.quoteReplacement(title(p)));
         }
-        Matcher m = Pattern.compile("\\b[a-zA-Z]+\\b").matcher(s);
+        Matcher m = WORD.matcher(s);
         StringBuffer out = new StringBuffer();
         while (m.find()) {
             String f = FIX.get(m.group().toLowerCase(Locale.ROOT));

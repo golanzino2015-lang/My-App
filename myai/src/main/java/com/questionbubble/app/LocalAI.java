@@ -193,6 +193,9 @@ final class LocalAI {
 
     /** Makes a new random brain. Blocks; call off the main thread. */
     void create(String aiName, Size s) {
+        busy = "Building brain…";
+        error = null;
+        changed();
         stopTraining();
         synchronized (lock) {
             busy = "Building brain…";
@@ -282,7 +285,7 @@ final class LocalAI {
         boolean grow = h == 0;  // a new brain learns every word in the lessons
         for (String[] l : mine) addExchange(l, new Words.IntList(), true); // your words are always learned
         try (BufferedReader r = new BufferedReader(new InputStreamReader(
-                new GZIPInputStream(app.getAssets().open("myai/lessons.txt.gz")), StandardCharsets.UTF_8))) {
+                new GZIPInputStream(app.getAssets().open("myai/lessons.bin")), StandardCharsets.UTF_8))) {
             for (String line; (line = r.readLine()) != null; ) {
                 String[] parts = line.replace("zzname", me).split("\t");
                 starts.add(stream.n);
@@ -299,6 +302,8 @@ final class LocalAI {
             starts.add(stream.n);
             addExchange(l, stream, true);
         }
+        userCache.clear();
+        replyCache.clear();
         int[] s = stream.toArray(), st = starts.toArray();
         if (h == 0) {
             pendingStream = s;
@@ -311,12 +316,21 @@ final class LocalAI {
         dataReady = true;
     }
 
+    private final java.util.HashMap<String, List<String>> userCache = new java.util.HashMap<>(), replyCache = new java.util.HashMap<>();
+
     private void addExchange(String[] ex, Words.IntList out, boolean learnWords) {
+        List<String> u = userCache.get(ex[0]), a = replyCache.get(ex[1]);
+        if (u == null) userCache.put(ex[0], u = Words.userWords(ex[0]));
+        if (a == null) replyCache.put(ex[1], a = Words.normalize(ex[1]));
         if (learnWords) {
-            for (String w : Words.userWords(ex[0])) if (!Words.UNK_MARK.equals(w)) vocab.add(w);
-            for (String w : Words.normalize(ex[1])) vocab.add(w);
+            for (String w : u) if (!Words.UNK_MARK.equals(w)) vocab.add(w);
+            for (String w : a) vocab.add(w);
         }
-        Words.encode(vocab, ex[0], ex[1], out);
+        out.add(Words.USER);
+        for (String w : u) out.add(vocab.id(w));
+        out.add(Words.AI);
+        for (String w : a) out.add(vocab.id(w));
+        out.add(Words.END);
     }
 
     /** Replaces your lessons and retrains on them. Blocks; call off the main thread. */

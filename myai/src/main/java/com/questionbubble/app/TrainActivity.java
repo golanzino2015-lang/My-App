@@ -74,7 +74,7 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
 
     private String state() {
         if (ai.busy() != null) return "busy:" + ai.busy();
-        if (!ai.exists()) return "none";
+        if (!ai.exists()) return "none:" + ai.error();
         return "brain:" + ai.lessons().size();
     }
 
