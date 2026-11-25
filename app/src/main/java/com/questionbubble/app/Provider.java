@@ -28,6 +28,12 @@ enum Provider {
                     {"gemini-3.5-flash", "Fast and capable, great with images"},
                     {"gemini-3.5-flash-lite", "Fastest and cheapest"},
                     {"gemini-3-flash", "Previous generation"},
+            }),
+
+    /** Your own AI, trained from scratch on this phone. No key, works offline. */
+    LOCAL("local", "My AI", "On this phone", "", "", "", "my-ai",
+            new String[][]{
+                    {"my-ai", "Trained from scratch on this phone"},
             });
 
     final String id, label, company, keyHint, keyUrl, keySite, defaultModel;
@@ -61,8 +67,14 @@ enum Provider {
             case "gemini-3.5-flash": return "Gemini 3.5 Flash";
             case "gemini-3.5-flash-lite": return "Gemini 3.5 Flash-Lite";
             case "gemini-3-flash": return "Gemini 3 Flash";
+            case "my-ai": return "My AI";
             default: return id;
         }
+    }
+
+    /** The online AIs, which need an API key. */
+    static Provider[] cloud() {
+        return new Provider[]{OPENAI, CLAUDE, GEMINI};
     }
 
     static Provider fromId(String id) {
