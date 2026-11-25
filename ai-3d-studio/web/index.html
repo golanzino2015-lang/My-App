@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 3D Studio</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+    "three": "./vendor/three/three.module.min.js",
+    "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <header class="brand">
+      <span class="logo" aria-hidden="true">◆</span>
+      <h1>AI 3D Studio</h1>
+      <span id="engine" class="chip">checking…</span>
+    </header>
+
+    <section class="group">
+      <label for="prompt" class="label">Prompt</label>
+      <textarea id="prompt" rows="3" placeholder="A wooden treasure chest with gold trim"></textarea>
+      <div id="drop" class="drop" tabindex="0">
+        <input id="image" type="file" accept="image/*" hidden>
+        <img id="preview" alt="" hidden>
+        <span id="dropText">Or drop / click to add an image (optional)</span>
+        <button id="clearImage" class="icon" title="Remove image" hidden>✕</button>
+      </div>
+    </section>
+
+    <section class="group">
+      <div class="row">
+        <label for="generator" class="label">Engine</label>
+        <select id="generator"></select>
+      </div>
+      <div class="row">
+        <label class="label">Quality</label>
+        <div class="seg" id="quality">
+          <button data-v="fast">Fast</button>
+          <button data-v="balanced" class="on">Balanced</button>
+          <button data-v="high">High</button>
+        </div>
+      </div>
+      <div class="row">
+        <label for="seed" class="label">Seed</label>
+        <div class="inline">
+          <input id="seed" type="number" value="1" min="0" step="1">
+          <button id="randSeed" class="icon" title="Random seed">⟳</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="group">
+      <div class="row">
+        <label for="faces" class="label">Triangles</label>
+        <input id="facesNum" type="number" min="500" step="500" value="50000">
+      </div>
+      <input id="faces" type="range" min="0" max="1000" value="500">
+      <div class="hint"><span>500</span><span id="facesMax">max</span></div>
+      <div class="row">
+        <label for="tex" class="label">Texture resolution</label>
+        <select id="tex"></select>
+      </div>
+      <button id="apply" class="secondary" disabled>Apply to current model</button>
+    </section>
+
+    <button id="go" class="primary">Generate 3D model</button>
+    <div id="job" class="job" hidden>
+      <div class="bar"><div id="barFill"></div></div>
+      <span id="jobText"></span>
+    </div>
+    <p id="error" class="error" hidden></p>
+
+    <section class="group history">
+      <div class="label">History</div>
+      <ul id="history"></ul>
+    </section>
+  </aside>
+
+  <main class="stage">
+    <div class="toolbar">
+      <div class="seg" id="shading" title="Viewport shading (1, 2, 3)">
+        <button data-v="solid">Solid</button>
+        <button data-v="textured" class="on">Textured</button>
+        <button data-v="normals">Normals</button>
+      </div>
+      <button id="wire" class="toggle" title="Wireframe overlay (W)">Wireframe</button>
+      <button id="grid" class="toggle on" title="Grid (G)">Grid</button>
+      <button id="spin" class="toggle" title="Auto-rotate (R)">Spin</button>
+      <button id="frame" class="toggle" title="Frame model (F)">Frame</button>
+      <span class="spacer"></span>
+      <a id="download" class="toggle" download hidden>Download .glb</a>
+    </div>
+    <div id="viewport"></div>
+    <div id="empty" class="empty">Type a prompt and press <b>Generate</b>.<br>
+      Drag to orbit · right-drag to pan · scroll to zoom</div>
+    <div id="stats" class="stats" hidden></div>
+  </main>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

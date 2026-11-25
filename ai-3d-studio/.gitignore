@@ -1,0 +1,5 @@
+outputs/
+models/
+TRELLIS/
+venv/
+__pycache__/
