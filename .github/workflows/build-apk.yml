@@ -17,21 +17,18 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle   # keep downloaded build tools between runs
 
-      - name: Build APKs
+      # My AI first, so its download is published even if My App's build has a problem.
+      # Download servers sometimes answer "too many requests", so retry with a pause.
+      - name: Build My AI
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug :myai:assembleDebug --no-daemon --stacktrace
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: QuestionBubble-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: MyAI-apk
-          path: myai/build/outputs/apk/debug/myai-debug.apk
+          for i in 1 2 3; do
+            ./gradlew :myai:assembleDebug --no-daemon && exit 0
+            echo "Build failed (attempt $i), retrying in $((i * 30))s"; sleep $((i * 30))
+          done
+          exit 1
 
       # One fixed link that downloads the newest My AI APK directly (no zip):
       # https://github.com/<owner>/<repo>/releases/download/my-ai/MyAI.apk
@@ -43,3 +40,21 @@ jobs:
           gh release view my-ai >/dev/null 2>&1 || gh release create my-ai --title "My AI" \
             --notes "Newest build of My AI. Download MyAI.apk below and install it." --target "$GITHUB_SHA"
           gh release upload my-ai MyAI.apk --clobber
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MyAI-apk
+          path: myai/build/outputs/apk/debug/myai-debug.apk
+
+      - name: Build My App
+        run: |
+          for i in 1 2 3; do
+            ./gradlew :app:assembleDebug --no-daemon && exit 0
+            echo "Build failed (attempt $i), retrying in $((i * 30))s"; sleep $((i * 30))
+          done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuestionBubble-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
