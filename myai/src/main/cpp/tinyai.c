@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 enum { LN1W, LN1B, QKVW, QKVB, PROJW, PROJB, LN2W, LN2B, FCW, FCB, FCPROJW, FCPROJB, NLT };
 enum { PH_TRAIN = 1, PH_REDUCE, PH_ADAM };
@@ -433,6 +436,8 @@ static void *worker_main(void *arg) {
     Worker *w = arg;
     Model *m = w->m;
     int seen = 0;
+    // Low priority: whatever you are doing on the phone always goes first.
+    setpriority(PRIO_PROCESS, (id_t) syscall(SYS_gettid), 10);
     for (;;) {
         pthread_mutex_lock(&m->mu);
         while (m->gen == seen && !m->quit) pthread_cond_wait(&m->go, &m->mu);

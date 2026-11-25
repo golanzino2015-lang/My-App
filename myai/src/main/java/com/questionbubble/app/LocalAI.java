@@ -392,6 +392,7 @@ final class LocalAI {
     }
 
     private void trainLoop() {
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
         long lastSave = System.currentTimeMillis(), lastUi = 0, windowStart = System.nanoTime();
         long windowTokens = 0;
         double lossSum = 0;
