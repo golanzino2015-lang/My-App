@@ -39,7 +39,7 @@ jobs:
           cp myai/build/outputs/apk/debug/myai-debug.apk MyAI.apk
           gh release view my-ai >/dev/null 2>&1 || gh release create my-ai --title "My AI" \
             --notes "Newest build of My AI. Download MyAI.apk below and install it." --target "$GITHUB_SHA"
-          gh release upload my-ai MyAI.apk myai/server/brain_server.py --clobber
+          gh release upload my-ai MyAI.apk --clobber
 
       - uses: actions/upload-artifact@v4
         with:

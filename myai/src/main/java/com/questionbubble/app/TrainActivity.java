@@ -132,7 +132,7 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
         }
         add(sizes, 10, step++);
 
-        PillButton restore = new PillButton(this, "Restore from my PC", PillButton.Kind.SECONDARY);
+        PillButton restore = new PillButton(this, "Restore from cloud", PillButton.Kind.SECONDARY);
         restore.setOnClickListener(v -> backupSheet(true));
 
         PillButton create = new PillButton(this, "Create brain", PillButton.Kind.PRIMARY);
@@ -244,11 +244,11 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
                     }
                 }));
         String bsub;
-        if (!ai.backupSetUp()) bsub = "Keep a copy on your PC, so a reinstall doesn't lose it";
+        if (!ai.backupSetUp()) bsub = "Keep a copy online, so a reinstall doesn't lose it";
         else if (!ai.backupNote().isEmpty()) bsub = ai.backupNote();
-        else if (ai.lastBackup() > 0) bsub = "Last backup " + ago(ai.lastBackup()) + " · every 10 min while training";
-        else bsub = "Backs up every 10 minutes while training";
-        Rows.add(more, Rows.row(this, R.drawable.ic_cpu, "Backup to my PC", bsub,
+        else if (ai.lastBackup() > 0) bsub = "Last backup " + ago(ai.lastBackup()) + " · every 30 min on Wi-Fi";
+        else bsub = "Backs up every 30 minutes on Wi-Fi while training";
+        Rows.add(more, Rows.row(this, R.drawable.ic_shield, "Cloud backup", bsub,
                 Rows.value(this, ai.backupSetUp() ? "On" : "Off"), () -> backupSheet(false)));
         Rows.add(more, Rows.row(this, R.drawable.ic_trash, "Delete brain", "Erases everything it learned",
                 null, () -> Sheets.confirm(this, "Delete " + ai.name() + "?",
@@ -316,48 +316,50 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
         s.show();
     }
 
-    /** Set up PC backup (restore = false) or bring a brain back from the PC (restore = true). */
+    /** Set up cloud backup (restore = false) or bring a brain back from the cloud (restore = true). */
     private void backupSheet(boolean restore) {
         Sheet s = new Sheet(this);
-        s.title(restore ? "Restore from my PC" : "Backup to my PC",
-                "On your PC, run brain_server.py and type the address and pairing code it shows. "
-                        + "Your phone must be on the same Wi-Fi.");
-        EditText addr = field("Address, like 192.168.1.20:8765");
-        addr.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        addr.setText(Prefs.backupUrl(this).replace("http://", ""));
-        EditText code = field("Pairing code");
-        code.setInputType(InputType.TYPE_CLASS_NUMBER);
-        code.setText(Prefs.backupCode(this));
+        s.title(restore ? "Restore from cloud" : "Cloud backup",
+                "Saved in your own private GitHub repository. Enter its name and your access key "
+                        + "(see the setup steps). Only you can see it.");
+        EditText repo = field("Repository, like my-ai-brain");
+        repo.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        repo.setText(Prefs.cloudRepo(this).isEmpty() ? "my-ai-brain" : Prefs.cloudRepo(this));
+        EditText key = field("Access key (github_pat_…)");
+        key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        key.setText(Prefs.cloudToken(this));
         TextView msg = Theme.text(this, "", Theme.Type.CAPTION);
-        s.add(addr, 18);
-        s.add(code, 10);
+        s.add(repo, 18);
+        s.add(key, 10);
         s.add(msg, 10);
         PillButton go = new PillButton(this, restore ? "Restore brain" : "Connect and back up now", PillButton.Kind.PRIMARY);
         go.setOnClickListener(v -> {
-            String url = Backup.normalize(addr.getText().toString()), c = code.getText().toString().trim();
-            if (url.isEmpty() || c.isEmpty()) {
+            String r0 = repo.getText().toString(), k = key.getText().toString().trim();
+            if (r0.trim().isEmpty() || k.isEmpty()) {
                 Theme.shake(go);
                 return;
             }
             go.setLoading(true);
+            msg.setTextColor(Theme.TEXT_2);
             msg.setText(restore ? "Downloading the brain…" : "Connecting…");
             new Thread(() -> {
                 String result;
                 try {
-                    org.json.JSONObject h = Backup.hello(url, c);
-                    if (restore && !h.optBoolean("has_brain")) throw new Exception("No brain is saved on the PC yet");
-                    Prefs.setBackup(this, url, c);
-                    if (restore) ai.restore(url, c);
-                    else ai.backupNow();
+                    String r = Backup.normalize(r0, k);
+                    org.json.JSONObject h = Backup.hello(r, k);
+                    if (restore && !h.optBoolean("has_brain")) throw new Exception("No brain is saved in the cloud yet");
+                    Prefs.setCloud(this, r, k);
+                    if (restore) ai.restore(r, k);
+                    else ai.backupNow(true);
                     result = null;
                 } catch (Exception e) {
                     result = Backup.explain(e);
                 }
-                String r = result;
+                String res = result;
                 runOnUiThread(() -> {
                     go.setLoading(false);
-                    if (r != null) {
-                        msg.setText(r);
+                    if (res != null) {
+                        msg.setText(res);
                         msg.setTextColor(0xFFFF8A80);
                         return;
                     }
@@ -369,9 +371,9 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
         });
         s.add(go, 16);
         if (!restore && ai.backupSetUp()) {
-            PillButton off = new PillButton(this, "Turn off backup", PillButton.Kind.GHOST);
+            PillButton off = new PillButton(this, "Turn off cloud backup", PillButton.Kind.GHOST);
             off.setOnClickListener(v -> {
-                Prefs.setBackup(this, "", "");
+                Prefs.setCloud(this, "", "");
                 s.close();
                 render();
             });

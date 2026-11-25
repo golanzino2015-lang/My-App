@@ -87,8 +87,8 @@ final class LocalAI {
     private String sampleQ = "", sampleA = "";
     private String error;
 
-    // PC backup
-    static final long BACKUP_EVERY_MS = 10 * 60_000;
+    // cloud backup
+    static final long BACKUP_EVERY_MS = 30 * 60_000;
     private volatile boolean uploading;
     private volatile long lastBackup;
     private volatile String backupNote = "";
@@ -490,16 +490,30 @@ final class LocalAI {
         return Words.detokenize(w);
     }
 
-    // ---------------------------------------------------------------- PC backup
+    // ---------------------------------------------------------------- cloud backup
 
-    boolean backupSetUp() { return !Prefs.backupUrl(app).isEmpty(); }
+    boolean backupSetUp() { return !Prefs.cloudRepo(app).isEmpty(); }
     String backupNote() { return backupNote; }
     long lastBackup() { return lastBackup; }
 
-    /** Sends the saved brain to the PC in the background. Skips if one is already on its way. */
-    void backupNow() {
-        String url = Prefs.backupUrl(app), code = Prefs.backupCode(app);
+    /** True on Wi-Fi (or any network that isn't charged by the megabyte). */
+    private boolean onWifi() {
+        android.net.ConnectivityManager cm = app.getSystemService(android.net.ConnectivityManager.class);
+        android.net.NetworkCapabilities nc = cm.getNetworkCapabilities(cm.getActiveNetwork());
+        return nc != null && nc.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+    }
+
+    /** Sends the saved brain to the cloud in the background. Skips if one is on its way or not on Wi-Fi. */
+    void backupNow() { backupNow(false); }
+
+    void backupNow(boolean evenOnMobileData) {
+        String url = Prefs.cloudRepo(app), code = Prefs.cloudToken(app);
         if (url.isEmpty() || uploading || !modelFile.exists() || !metaFile.exists()) return;
+        if (!evenOnMobileData && !onWifi()) {
+            backupNote = "Waiting for Wi-Fi to back up";
+            changed();
+            return;
+        }
         uploading = true;
         backupNote = "Backing up…";
         changed();
@@ -516,11 +530,11 @@ final class LocalAI {
         }, "my-ai-backup").start();
     }
 
-    /** Replaces this phone's brain with the one saved on the PC. Blocks; call off the main thread. */
+    /** Replaces this phone's brain with the one saved in the cloud. Blocks; call off the main thread. */
     void restore(String url, String code) throws Exception {
         stopTraining();
         synchronized (lock) {
-            busy = "Restoring from your PC…";
+            busy = "Downloading your brain from the cloud…";
             error = null;
             changed();
             try {

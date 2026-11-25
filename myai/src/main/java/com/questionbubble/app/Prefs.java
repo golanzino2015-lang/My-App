@@ -23,17 +23,17 @@ final class Prefs {
         return sp(c).getBoolean("haptics", true);
     }
 
-    /** PC backup server address ("" = not set up) and its pairing code. */
-    static String backupUrl(Context c) {
-        return sp(c).getString("backup_url", "");
+    /** Cloud backup: your private GitHub repository ("owner/name", "" = off) and its access key. */
+    static String cloudRepo(Context c) {
+        return sp(c).getString("cloud_repo", "");
     }
 
-    static String backupCode(Context c) {
-        return sp(c).getString("backup_code", "");
+    static String cloudToken(Context c) {
+        return sp(c).getString("cloud_token", "");
     }
 
-    static void setBackup(Context c, String url, String code) {
-        sp(c).edit().putString("backup_url", url).putString("backup_code", code).apply();
+    static void setCloud(Context c, String repo, String token) {
+        sp(c).edit().putString("cloud_repo", repo).putString("cloud_token", token).apply();
     }
 
     private Prefs() {}
