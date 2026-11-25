@@ -87,6 +87,12 @@ final class LocalAI {
     private String sampleQ = "", sampleA = "";
     private String error;
 
+    // PC backup
+    static final long BACKUP_EVERY_MS = 10 * 60_000;
+    private volatile boolean uploading;
+    private volatile long lastBackup;
+    private volatile String backupNote = "";
+
     private volatile boolean training;
     private Thread trainer;
 
@@ -439,9 +445,11 @@ final class LocalAI {
             if (now - lastSave > 120_000) {
                 save();
                 lastSave = now;
+                if (now - lastBackup > BACKUP_EVERY_MS) backupNow();
             }
         }
         save();
+        backupNow();
         changed();
     }
 
@@ -480,6 +488,55 @@ final class LocalAI {
         List<String> w = new ArrayList<>();
         for (int id : out) if (id < vocab.size()) w.add(vocab.words.get(id));
         return Words.detokenize(w);
+    }
+
+    // ---------------------------------------------------------------- PC backup
+
+    boolean backupSetUp() { return !Prefs.backupUrl(app).isEmpty(); }
+    String backupNote() { return backupNote; }
+    long lastBackup() { return lastBackup; }
+
+    /** Sends the saved brain to the PC in the background. Skips if one is already on its way. */
+    void backupNow() {
+        String url = Prefs.backupUrl(app), code = Prefs.backupCode(app);
+        if (url.isEmpty() || uploading || !modelFile.exists() || !metaFile.exists()) return;
+        uploading = true;
+        backupNote = "Backing up…";
+        changed();
+        new Thread(() -> {
+            try {
+                Backup.upload(url, code, modelFile, metaFile);
+                lastBackup = System.currentTimeMillis();
+                backupNote = "";
+            } catch (Exception e) {
+                backupNote = Backup.explain(e);
+            }
+            uploading = false;
+            changed();
+        }, "my-ai-backup").start();
+    }
+
+    /** Replaces this phone's brain with the one saved on the PC. Blocks; call off the main thread. */
+    void restore(String url, String code) throws Exception {
+        stopTraining();
+        synchronized (lock) {
+            busy = "Restoring from your PC…";
+            error = null;
+            changed();
+            try {
+                Backup.download(url, code, modelFile, metaFile);
+                freeBrain();
+                vocab = null;
+                lessons.clear();
+                synchronized (lossHist) { lossHist.clear(); }
+                loaded = false;
+                lastBackup = System.currentTimeMillis();
+            } finally {
+                busy = null;
+            }
+        }
+        ensureLoaded();
+        changed();
     }
 
     // ---------------------------------------------------------------- saving

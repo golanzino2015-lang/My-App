@@ -75,7 +75,7 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
     private String state() {
         if (ai.busy() != null) return "busy:" + ai.busy();
         if (!ai.exists()) return "none:" + ai.error();
-        return "brain:" + ai.lessons().size();
+        return "brain:" + ai.lessons().size() + ":" + ai.backupSetUp() + ":" + ai.backupNote() + ":" + ai.lastBackup();
     }
 
     @Override
@@ -132,6 +132,9 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
         }
         add(sizes, 10, step++);
 
+        PillButton restore = new PillButton(this, "Restore from my PC", PillButton.Kind.SECONDARY);
+        restore.setOnClickListener(v -> backupSheet(true));
+
         PillButton create = new PillButton(this, "Create brain", PillButton.Kind.PRIMARY);
         create.setOnClickListener(v -> {
             create.setLoading(true);
@@ -139,6 +142,7 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
             new Thread(() -> ai.create(n, pickedSize)).start();
         });
         add(create, 28, step++);
+        add(restore, 10, step++);
     }
 
     private void renderBrain(int step) {
@@ -239,6 +243,13 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
                         startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
                     }
                 }));
+        String bsub;
+        if (!ai.backupSetUp()) bsub = "Keep a copy on your PC, so a reinstall doesn't lose it";
+        else if (!ai.backupNote().isEmpty()) bsub = ai.backupNote();
+        else if (ai.lastBackup() > 0) bsub = "Last backup " + ago(ai.lastBackup()) + " · every 10 min while training";
+        else bsub = "Backs up every 10 minutes while training";
+        Rows.add(more, Rows.row(this, R.drawable.ic_cpu, "Backup to my PC", bsub,
+                Rows.value(this, ai.backupSetUp() ? "On" : "Off"), () -> backupSheet(false)));
         Rows.add(more, Rows.row(this, R.drawable.ic_trash, "Delete brain", "Erases everything it learned",
                 null, () -> Sheets.confirm(this, "Delete " + ai.name() + "?",
                         "Everything it learned will be erased. This can't be undone.", "Delete brain", () -> {
@@ -303,6 +314,75 @@ public class TrainActivity extends Activity implements LocalAI.Listener {
         });
         s.add(add, 18);
         s.show();
+    }
+
+    /** Set up PC backup (restore = false) or bring a brain back from the PC (restore = true). */
+    private void backupSheet(boolean restore) {
+        Sheet s = new Sheet(this);
+        s.title(restore ? "Restore from my PC" : "Backup to my PC",
+                "On your PC, run brain_server.py and type the address and pairing code it shows. "
+                        + "Your phone must be on the same Wi-Fi.");
+        EditText addr = field("Address, like 192.168.1.20:8765");
+        addr.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        addr.setText(Prefs.backupUrl(this).replace("http://", ""));
+        EditText code = field("Pairing code");
+        code.setInputType(InputType.TYPE_CLASS_NUMBER);
+        code.setText(Prefs.backupCode(this));
+        TextView msg = Theme.text(this, "", Theme.Type.CAPTION);
+        s.add(addr, 18);
+        s.add(code, 10);
+        s.add(msg, 10);
+        PillButton go = new PillButton(this, restore ? "Restore brain" : "Connect and back up now", PillButton.Kind.PRIMARY);
+        go.setOnClickListener(v -> {
+            String url = Backup.normalize(addr.getText().toString()), c = code.getText().toString().trim();
+            if (url.isEmpty() || c.isEmpty()) {
+                Theme.shake(go);
+                return;
+            }
+            go.setLoading(true);
+            msg.setText(restore ? "Downloading the brain…" : "Connecting…");
+            new Thread(() -> {
+                String result;
+                try {
+                    org.json.JSONObject h = Backup.hello(url, c);
+                    if (restore && !h.optBoolean("has_brain")) throw new Exception("No brain is saved on the PC yet");
+                    Prefs.setBackup(this, url, c);
+                    if (restore) ai.restore(url, c);
+                    else ai.backupNow();
+                    result = null;
+                } catch (Exception e) {
+                    result = Backup.explain(e);
+                }
+                String r = result;
+                runOnUiThread(() -> {
+                    go.setLoading(false);
+                    if (r != null) {
+                        msg.setText(r);
+                        msg.setTextColor(0xFFFF8A80);
+                        return;
+                    }
+                    s.close();
+                    Snack.show(this, restore ? "Brain restored" : "Connected. Backing up now", R.drawable.ic_check);
+                    render();
+                });
+            }).start();
+        });
+        s.add(go, 16);
+        if (!restore && ai.backupSetUp()) {
+            PillButton off = new PillButton(this, "Turn off backup", PillButton.Kind.GHOST);
+            off.setOnClickListener(v -> {
+                Prefs.setBackup(this, "", "");
+                s.close();
+                render();
+            });
+            s.add(off, 6);
+        }
+        s.show();
+    }
+
+    static String ago(long t) {
+        long m = (System.currentTimeMillis() - t) / 60000;
+        return m < 1 ? "just now" : m < 60 ? m + " min ago" : (m / 60) + " h ago";
     }
 
     // ---------------------------------------------------------------- pieces
